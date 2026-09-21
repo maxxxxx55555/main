@@ -1,0 +1,43 @@
+[project]
+name = "ai-employee-bot"
+version = "0.1.0"
+description = "Telegram AI-Сотрудник — виртуальный ассистент для малого бизнеса (aiogram 3 + SQLAlchemy 2 + LLM + Telegram Stars)"
+requires-python = ">=3.11"
+dependencies = [
+    "aiogram>=3.13,<4",
+    "sqlalchemy[asyncio]>=2.0,<3",
+    "aiosqlite>=0.20",
+    "pydantic-settings>=2.4",
+    "openai>=1.40",
+]
+
+[project.optional-dependencies]
+prod = [
+    "asyncpg>=0.29",
+    "redis>=5.0",
+    "pgvector>=0.3",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.6",
+]
+
+[project.scripts]
+ai-employee = "app.main:run"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

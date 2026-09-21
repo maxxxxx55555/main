@@ -1,0 +1,85 @@
+"""Конфигурация приложения — единственный источник настроек (12-factor).
+
+Никаких прямых os.getenv в других модулях: только app.config.Settings.
+"""
+
+from __future__ import annotations
+
+from functools import lru_cache
+from pathlib import Path
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=str(BASE_DIR / ".env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+        case_sensitive=False,
+    )
+
+    # --- Telegram ---
+    bot_token: str = ""
+
+    # --- Database / cache ---
+    database_url: str = "sqlite+aiosqlite:///./data/bot.db"
+    redis_url: str | None = None
+
+    # --- LLM ---
+    llm_api_key: str = ""
+    llm_base_url: str = "https://open.bigmodel.cn/api/paas/v4"
+    llm_model: str = "glm-4.5"
+    llm_fallback_base_url: str = ""
+    llm_fallback_api_key: str = ""
+    llm_fallback_model: str = ""
+    llm_max_retries: int = 3
+    llm_timeout: float = 60.0
+    llm_mock: bool = False
+
+    # --- Embeddings / RAG ---
+    embedding_model: str = "embedding-3"
+    embedding_dim: int = 1024
+    rag_chunk_size: int = 1000
+    rag_chunk_overlap: int = 150
+    rag_top_k: int = 5
+
+    # --- Context ---
+    context_window: int = 20
+    context_token_budget: int = 3000
+    summary_trigger_messages: int = 40
+
+    # --- Plans / limits ---
+    period_days: int = 30
+    free_limit: int = 30
+    pro_limit: int = 500
+    business_limit: int = 2000
+    pro_price_stars: int = 100
+    business_price_stars: int = 250
+
+    # --- Rate limiting / safety ---
+    rate_limit_per_minute: int = 20
+    max_message_len: int = 4000
+    admin_ids: str = ""
+    default_tz: str = "UTC"
+
+    # --- Misc ---
+    log_level: str = "INFO"
+
+    @property
+    def admin_id_set(self) -> set[int]:
+        if not self.admin_ids.strip():
+            return set()
+        return {int(x) for x in self.admin_ids.replace(" ", "").split(",") if x}
+
+    @property
+    def use_mock_llm(self) -> bool:
+        """Mock-режим: без ключа или принудительно через LLM_MOCK=1."""
+        return self.llm_mock or not self.llm_api_key.strip()
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

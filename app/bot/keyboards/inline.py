@@ -1,0 +1,57 @@
+"""Inline-клавиатуры: меню, выбор тарифа, апсейл."""
+
+from __future__ import annotations
+
+from aiogram.types import InlineKeyboardMarkup
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+from app.services.billing.plans import PlanCatalog
+
+
+def main_menu(catalog: PlanCatalog) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="⭐️ Тарифы", callback_data="plans")
+    kb.button(text="📚 База знаний", callback_data="knowledge")
+    kb.button(text="ℹ️ Помощь", callback_data="help")
+    kb.adjust(2, 1)
+    return kb.as_markup()
+
+
+def plans_kb(catalog: PlanCatalog) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    for plan in catalog.paid():
+        kb.button(
+            text=f"⭐️ {plan.title} — {plan.price_stars} Stars",
+            callback_data=f"buy:{plan.id}",
+        )
+    kb.button(text="⬅️ Назад", callback_data="menu")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def upsell_kb(catalog: PlanCatalog) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🚀 Перейти на PRO", callback_data="plans")
+    kb.button(text="🔄 Обновить лимит", callback_data="menu")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def knowledge_kb(can_upload: bool) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    if can_upload:
+        kb.button(text="➕ Добавить знания", callback_data="knowledge_add")
+    else:
+        kb.button(text="🚀 Подключить в PRO", callback_data="plans")
+    kb.button(text="🗑 Забыть обо мне", callback_data="forget_me")
+    kb.button(text="⬅️ Назад", callback_data="menu")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def forget_confirm_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="✅ Да, удалить всё", callback_data="forget_confirm")
+    kb.button(text="❌ Отмена", callback_data="menu")
+    kb.adjust(1)
+    return kb.as_markup()
