@@ -65,6 +65,14 @@ class Settings(BaseSettings):
     admin_ids: str = ""
     default_tz: str = "UTC"
 
+    # --- Webhook (prod) / health ---
+    webhook_mode: bool = False  # False = long polling (dev), True = webhook (prod)
+    webhook_base_url: str = ""  # https://bot.example.com
+    webhook_secret_path: str = "tg-webhook"  # путь: {webhook_base_url}/{webhook_secret_path}
+    webhook_secret_token: str = ""  # X-Telegram-Bot-Api-Secret-Token; пусто → сгенерировать
+    webapp_host: str = "0.0.0.0"
+    webapp_port: int = 8080  # веб-сервер: webhook + /health
+
     # --- Misc ---
     log_level: str = "INFO"
 
