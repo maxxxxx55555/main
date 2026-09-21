@@ -1,10 +1,16 @@
-"""RAG v2: chunking + retrieval. Embeddings — через AIProvider (mock или реальный)."""
+"""RAG v2: chunking + retrieval через локальное векторное хранилище (SQLite | ChromaDB).
+
+Embeddings:
+- VECTOR_STORE=sqlite (по умолчанию) — через AIProvider (mock в dev; embeddings API на платных LLM)
+- VECTOR_STORE=chroma — встроенная локальная embedding-модель Chroma (бесплатно,
+  работает даже с LLM без embeddings API: Groq/OpenRouter)
+"""
 
 from __future__ import annotations
 
 from app.config import Settings
-from app.db.repo.knowledge import KnowledgeRepo
 from app.services.ai.provider import AIProvider
+from app.services.ai.vector_store import SQLiteVectorStore, build_vector_store
 
 
 def chunk_text(text: str, chunk_size: int, overlap: int) -> list[str]:
@@ -28,23 +34,25 @@ class RagService:
         self.settings = settings
 
     async def add_text(self, session, owner_id: int, text: str) -> int:
-        """Разбивает текст на чанки, считает embeddings, сохраняет. Возвращает число чанков."""
+        """Разбивает текст на чанки, сохраняет в векторное хранилище. Возвращает число чанков."""
         chunks = chunk_text(text, self.settings.rag_chunk_size, self.settings.rag_chunk_overlap)
         if not chunks:
             return 0
-        embeddings = await self.provider.embed(chunks)
-        repo = KnowledgeRepo(session)
-        for chunk, emb in zip(chunks, embeddings, strict=True):
-            await repo.add_chunk(owner_id, chunk, emb)
-        return len(chunks)
+        store = build_vector_store(session, self.settings)
+        return await store.add(owner_id, chunks)
 
     async def retrieve(self, session, owner_id: int, query: str) -> list[str]:
         """Топ-K релевантных чанков базы знаний владельца. [] если база пуста."""
-        rows = await KnowledgeRepo(session).for_owner(owner_id)
-        if not rows:
+        store = build_vector_store(session, self.settings)
+        if (
+            isinstance(store, SQLiteVectorStore)
+            and await store.count(owner_id) == 0
+        ):
+            # Быстрая проверка пустой базы без вызова embeddings
             return []
-        embedding = (await self.provider.embed([query]))[0]
-        found = await KnowledgeRepo(session).search(
-            owner_id, embedding, top_k=self.settings.rag_top_k
-        )
-        return [row.content for row in found]
+        return await store.search(owner_id, query, top_k=self.settings.rag_top_k)
+
+    async def forget_owner(self, session, owner_id: int) -> None:
+        """Полное удаление базы знаний владельца (для /forget_me)."""
+        store = build_vector_store(session, self.settings)
+        await store.delete_for_owner(owner_id)

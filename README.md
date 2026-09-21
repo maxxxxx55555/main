@@ -4,8 +4,12 @@ Telegram-бот «AI-Сотрудник»: отвечает клиентам в�
 лидов, записывает на консультации и отвечает по вашей базе знаний. Монетизация —
 Telegram Stars (Freemium / Pro / Business).
 
+**$0-стек:** SQLite + Groq/OpenRouter (бесплатные LLM) + ChromaDB (локальные векторы) —
+ноль ежемесячных расходов на инфраструктуру.
+
 > ⚡ **Быстрый старт:** [`QUICK_START.md`](QUICK_START.md) — бот работает за 5 минут, без Docker
-> 🚀 **Деплой на VPS:** [`DEPLOY.md`](DEPLOY.md) · 📊 **Мониторинг:** [`MONITORING.md`](MONITORING.md)
+> 💸 **Хостинг за $0:** [`FREE_DEPLOY.md`](FREE_DEPLOY.md) (Cloudflare Tunnel / Render Free)
+> 🚀 **Деплой на VPS (€5):** [`DEPLOY.md`](DEPLOY.md) · 📊 **Мониторинг:** [`MONITORING.md`](MONITORING.md)
 > ✅ **Чек-лист запуска:** [`CHECKLIST.md`](CHECKLIST.md) · 📣 **Маркетинг:** [`docs/LAUNCH_MATERIALS.md`](docs/LAUNCH_MATERIALS.md)
 > 📚 Продукт и архитектура: [`docs/PRD.md`](docs/PRD.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/MARKETING.md`](docs/MARKETING.md)
 

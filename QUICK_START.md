@@ -121,25 +121,39 @@ ADMIN_IDS=123456789
 
 ---
 
-## 🔑 Подключение реального AI (2 минуты)
+## 🔑 Подключение реального AI — бесплатно (2 минуты)
 
-Вариант А — **GLM (дёшево, есть бесплатная квота)**:
-1. Зарегистрируйтесь на https://open.bigmodel.cn → API Keys
+**Groq (рекомендую — бесплатный tier, очень быстрый):**
+1. Ключ: https://console.groq.com/keys
 2. В `.env`:
    ```env
-   LLM_API_KEY=ваш_ключ_zhipu
-   LLM_BASE_URL=https://open.bigmodel.cn/api/paas/v4
-   LLM_MODEL=glm-4.5
+   LLM_PROVIDER=groq
+   LLM_API_KEY=gsk_ваш_ключ
+   ```
+   Пресет подставит `llama-3.3-70b-versatile @ https://api.groq.com/openai/v1` автоматически.
+
+**OpenRouter (модели `:free`):**
+1. Ключ: https://openrouter.ai/keys
+2. В `.env`:
+   ```env
+   LLM_PROVIDER=openrouter
+   LLM_API_KEY=sk-or-ваш_ключ
+   # опционально конкретная модель:
+   # LLM_MODEL=google/gemma-2-9b-it:free
    ```
 
-Вариант Б — **OpenAI**:
-```env
-LLM_API_KEY=sk-...
-LLM_BASE_URL=https://api.openai.com/v1
-LLM_MODEL=gpt-4o-mini
-```
+Перезапустите бота — в логе должно быть `mock_llm=False`. Ответы стали настоящими, расходы — $0.
 
-Перезапустите бота — в логе должно быть `mock_llm=False`. Ответы стали настоящими.
+## 🧠 RAG на $0
+
+По умолчанию векторы хранятся в SQLite (без зависимостей). Для Groq/OpenRouter
+(у них нет embeddings API) включите локальный ChromaDB:
+```env
+VECTOR_STORE=chroma
+CHROMA_DIR=./chroma_db
+```
+Chroma использует встроенную локальную embedding-модель (скачивается один раз) —
+внешние сервисы не нужны. Хостинг за $0: см. `FREE_DEPLOY.md`.
 
 ---
 

@@ -28,16 +28,24 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./data/bot.db"
     redis_url: str | None = None
 
-    # --- LLM ---
+    # --- LLM ($0-стек: бесплатные провайдеры через OpenAI-совместимый API) ---
+    # llm_provider выбирает пресет base_url+model; явные LLM_BASE_URL/LLM_MODEL имеют приоритет.
+    # Провайдеры: groq (бесплатный tier) | openrouter (модели :free) | openai | glm | custom
+    llm_provider: str = "groq"
     llm_api_key: str = ""
-    llm_base_url: str = "https://open.bigmodel.cn/api/paas/v4"
-    llm_model: str = "glm-4.5"
+    llm_base_url: str = ""  # пусто → из пресета llm_provider
+    llm_model: str = ""     # пусто → из пресета llm_provider
     llm_fallback_base_url: str = ""
     llm_fallback_api_key: str = ""
     llm_fallback_model: str = ""
     llm_max_retries: int = 3
     llm_timeout: float = 60.0
     llm_mock: bool = False
+
+    # --- Vector store (RAG) ---
+    # sqlite (по умолчанию, встроенный cosine-поиск по BLOB) | chroma (локальный ./chroma_db)
+    vector_store: str = "sqlite"
+    chroma_dir: str = "./chroma_db"
 
     # --- Embeddings / RAG ---
     embedding_model: str = "embedding-3"
@@ -86,6 +94,28 @@ class Settings(BaseSettings):
     def use_mock_llm(self) -> bool:
         """Mock-режим: без ключа или принудительно через LLM_MOCK=1."""
         return self.llm_mock or not self.llm_api_key.strip()
+
+    # Пресеты бесплатных LLM-провайдеров ($0/мес)
+    LLM_PRESETS: dict[str, tuple[str, str]] = {
+        "groq": ("https://api.groq.com/openai/v1", "llama-3.3-70b-versatile"),
+        "openrouter": ("https://openrouter.ai/api/v1", "meta-llama/llama-3.1-8b-instruct:free"),
+        "openai": ("https://api.openai.com/v1", "gpt-4o-mini"),
+        "glm": ("https://open.bigmodel.cn/api/paas/v4", "glm-4.5"),
+    }
+
+    @property
+    def resolved_llm_base_url(self) -> str:
+        if self.llm_base_url.strip():
+            return self.llm_base_url
+        preset = self.LLM_PRESETS.get(self.llm_provider.strip().lower())
+        return preset[0] if preset else self.LLM_PRESETS["groq"][0]
+
+    @property
+    def resolved_llm_model(self) -> str:
+        if self.llm_model.strip():
+            return self.llm_model
+        preset = self.LLM_PRESETS.get(self.llm_provider.strip().lower())
+        return preset[1] if preset else self.LLM_PRESETS["groq"][1]
 
 
 @lru_cache

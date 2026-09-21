@@ -110,12 +110,15 @@ async def cb_forget(
 
 @router.callback_query(F.data == "forget_confirm")
 async def cb_forget_confirm(
-    callback: CallbackQuery, session: AsyncSession, user: User
+    callback: CallbackQuery, session: AsyncSession, user: User, rag=None
 ) -> None:
-    from app.db.repo.knowledge import KnowledgeRepo
-
     await MessageRepo(session).delete_history(user.id)
-    await KnowledgeRepo(session).delete_for_owner(user.id)
+    if rag is not None:
+        await rag.forget_owner(session, user.id)  # SQLite и/или ChromaDB
+    else:
+        from app.db.repo.knowledge import KnowledgeRepo
+
+        await KnowledgeRepo(session).delete_for_owner(user.id)
     await session.delete(user)
     await callback.message.edit_text("🗑 Все ваши данные удалены. Введите /start, чтобы начать заново.")
     await callback.answer()

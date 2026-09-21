@@ -68,14 +68,19 @@ class MockProvider:
 
 
 class OpenAICompatProvider:
-    """AsyncOpenAI с ретраями (backoff+джиттер) и опциональным fallback (§8.1-8.2)."""
+    """AsyncOpenAI с ретраями (backoff+джиттер) и опциональным fallback (§8.1-8.2).
+
+    Работает с любым OpenAI-совместимым API: Groq, OpenRouter (:free модели),
+    OpenAI, GLM — base_url берётся из пресета llm_provider (см. config.py).
+    """
 
     def __init__(self, settings: Settings) -> None:
         from openai import AsyncOpenAI
 
         self.settings = settings
+        self.model = settings.resolved_llm_model
         self.client = AsyncOpenAI(
-            base_url=settings.llm_base_url,
+            base_url=settings.resolved_llm_base_url,
             api_key=settings.llm_api_key,
             timeout=settings.llm_timeout,
             max_retries=0,  # ретраи контролируем сами
@@ -95,7 +100,7 @@ class OpenAICompatProvider:
 
     async def chat(self, messages: list[dict[str, str]]) -> Reply:
         try:
-            return await self._chat_with_retries(self, self.settings.llm_model, messages)
+            return await self._chat_with_retries(self, self.model, messages)
         except LLMUnavailable:
             if self.fallback is not None:
                 logger.warning("LLM primary failed, switching to fallback")

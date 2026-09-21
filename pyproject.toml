@@ -1,7 +1,7 @@
 [project]
 name = "ai-employee-bot"
-version = "0.1.0"
-description = "Telegram AI-Сотрудник — виртуальный ассистент для малого бизнеса (aiogram 3 + SQLAlchemy 2 + LLM + Telegram Stars)"
+version = "0.2.0"
+description = "Telegram AI-Сотрудник — виртуальный ассистент для малого бизнеса ($0-стек: SQLite + Groq/OpenRouter + ChromaDB)"
 requires-python = ">=3.11"
 dependencies = [
     "aiogram>=3.13,<4",
@@ -13,6 +13,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# $0-стек: локальный векторный поиск без внешних сервисов
+chroma = ["chromadb>=0.5"]
+# Необязательные тяжёлые зависимости (MVP работает без них — in-memory/SQLite)
 prod = [
     "asyncpg>=0.29",
     "redis>=5.0",

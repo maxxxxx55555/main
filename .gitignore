@@ -16,6 +16,7 @@ dist/
 
 # --- Local data ---
 data/
+chroma_db/
 *.db
 *.sqlite3
 *.log
