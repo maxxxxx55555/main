@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Awaitable, Callable
 from collections import defaultdict, deque
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from aiogram import BaseMiddleware

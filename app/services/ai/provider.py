@@ -22,7 +22,7 @@ class LLMUnavailable(Exception):
 
 
 class AIProvider(Protocol):
-    async def chat(self, messages: list[dict[str, str]]) -> "Reply": ...
+    async def chat(self, messages: list[dict[str, str]]) -> Reply: ...
     async def embed(self, texts: list[str]) -> list[list[float]]: ...
 
 
@@ -80,7 +80,7 @@ class OpenAICompatProvider:
             timeout=settings.llm_timeout,
             max_retries=0,  # ретраи контролируем сами
         )
-        self.fallback: "OpenAICompatProvider | None" = None
+        self.fallback: OpenAICompatProvider | None = None
         if settings.llm_fallback_base_url and settings.llm_fallback_api_key:
             self.fallback = OpenAICompatProvider.__new__(OpenAICompatProvider)
             self.fallback.settings = settings
@@ -105,7 +105,7 @@ class OpenAICompatProvider:
             raise
 
     async def _chat_with_retries(
-        self, provider: "OpenAICompatProvider", model: str, messages: list[dict[str, str]]
+        self, provider: OpenAICompatProvider, model: str, messages: list[dict[str, str]]
     ) -> Reply:
         last_exc: Exception | None = None
         for attempt in range(1, self.settings.llm_max_retries + 1):
@@ -117,7 +117,7 @@ class OpenAICompatProvider:
                 content = resp.choices[0].message.content or ""
                 tokens = resp.usage.total_tokens if resp.usage else len(content) // 4
                 return Reply(content=content, tokens=tokens)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 status = getattr(exc, "status_code", None)
                 if status not in RETRYABLE_STATUS and status is not None:
                     logger.error("LLM non-retryable error %s: %s", status, type(exc).__name__)

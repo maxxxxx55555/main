@@ -11,7 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
-from app.db.models.message import Message
+from app.db.models.message import Message as MessageModel
 from app.db.models.payment import Payment
 from app.db.models.user import User
 from app.db.repo.users import UserRepo
@@ -33,7 +33,7 @@ async def admin_stats(message: Message, session: AsyncSession, settings: Setting
     paid_users = (
         await session.execute(select(func.count(func.distinct(Payment.user_id))))
     ).scalar_one()
-    messages_total = (await session.execute(select(func.count(Message.id)))).scalar_one()
+    messages_total = (await session.execute(select(func.count(MessageModel.id)))).scalar_one()
     revenue = (await session.execute(select(func.sum(Payment.amount_stars)))).scalar() or 0
     await message.answer(
         "📈 <b>Админ-статистика</b>\n"

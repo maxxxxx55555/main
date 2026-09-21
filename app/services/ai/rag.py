@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from app.config import Settings
-from app.db.models.knowledge import KnowledgeBase
 from app.db.repo.knowledge import KnowledgeRepo
 from app.services.ai.provider import AIProvider
 

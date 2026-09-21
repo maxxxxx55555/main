@@ -5,8 +5,6 @@ from __future__ import annotations
 
 def test_app_assembles(settings):
     from app.bot.router import build_router
-    from app.config import Settings, get_settings
-    from app.db.base import build_engine, build_sessionmaker
     from app.main import run  # noqa: F401 — импорт точки входа валиден
     from app.services.ai.provider import MockProvider, build_provider
     from app.services.ai.rag import RagService

@@ -2,9 +2,9 @@ import datetime as dt
 
 from sqlalchemy import select, update
 
+from app.db.models.base import utcnow
 from app.db.models.user import User
 from app.db.repo.base import BaseRepo
-from app.db.models.base import utcnow
 
 
 class UserRepo(BaseRepo[User]):

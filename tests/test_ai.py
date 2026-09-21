@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from app.services.ai.context import approx_tokens, build_context
 from app.services.ai.provider import MockProvider, build_provider
 

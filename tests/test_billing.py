@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from app.db.repo.users import UserRepo
 from app.services.billing.plans import PlanCatalog
 from app.services.billing.stars import StarsBillingService

@@ -8,7 +8,6 @@ from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.keyboards.inline import main_menu
-from app.bot.states import ConfirmStates
 from app.config import Settings
 from app.db.models.user import User
 from app.db.repo.messages import MessageRepo

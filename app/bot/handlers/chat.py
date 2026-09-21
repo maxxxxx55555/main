@@ -14,10 +14,9 @@ from app.bot.keyboards.inline import upsell_kb
 from app.config import Settings
 from app.db.models.user import User
 from app.db.repo.messages import MessageRepo
-from app.db.repo.knowledge import KnowledgeRepo
 from app.services.ai.context import build_context
-from app.services.ai.provider import AIProvider, LLMUnavailable
 from app.services.ai.prompt import build_system_prompt
+from app.services.ai.provider import AIProvider, LLMUnavailable
 from app.services.ai.rag import RagService
 from app.services.billing.plans import PlanCatalog
 from app.services.limits.usage import LimitExceeded, UsageService
@@ -99,3 +98,11 @@ async def handle_chat(
     limit = catalog.limit_for(user.plan)
     suffix = usage.warning_suffix(remaining, limit, user.period_reset_at)
     await message.answer(reply.content[:4096 - len(suffix)] + suffix)
+
+
+@router.message(StateFilter(None))
+async def not_a_text(message: Message) -> None:
+    """Фолбэк для фото/голоса/стикеров: бот понимает только текст."""
+    await message.answer(
+        "✋ Я пока понимаю только текстовые сообщения. Напишите вопрос текстом 🙂"
+    )

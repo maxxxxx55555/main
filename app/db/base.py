@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from app.config import BASE_DIR, get_settings
+from app.config import get_settings
 from app.db.models import Base
 
 

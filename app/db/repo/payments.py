@@ -1,7 +1,6 @@
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.payment import Payment
 from app.db.repo.base import BaseRepo
@@ -24,13 +23,13 @@ class PaymentRepo(BaseRepo[Payment]):
         if exists is not None:
             return False
 
-        values = dict(
-            user_id=user_id,
-            plan=plan,
-            amount_stars=amount_stars,
-            status="paid",
-            telegram_payment_charge_id=charge_id,
-        )
+        values = {
+            "user_id": user_id,
+            "plan": plan,
+            "amount_stars": amount_stars,
+            "status": "paid",
+            "telegram_payment_charge_id": charge_id,
+        }
         dialect = getattr(getattr(self.session, "bind", None), "dialect", None)
         if dialect is not None and dialect.name == "postgresql":
             stmt = pg_insert(Payment).values(**values).on_conflict_do_nothing(

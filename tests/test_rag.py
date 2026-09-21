@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from app.db.repo.knowledge import KnowledgeRepo
 from app.db.repo.messages import MessageRepo
 from app.db.repo.users import UserRepo

@@ -7,6 +7,7 @@ Webhook-режим — по roadmap (docs/ARCHITECTURE.md §10, этап 2).
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import signal
 
@@ -100,7 +101,8 @@ async def run() -> None:
     logger.info("Бот запущен (long polling). Ctrl+C для остановки.")
     await stop_event.wait()
     polling_task.cancel()
-    await polling_task
+    with contextlib.suppress(asyncio.CancelledError):
+        await polling_task
     await bot.session.close()
     await engine.dispose()
     logger.info("Бот остановлен.")

@@ -80,7 +80,6 @@ async def knowledge_wrong_type(message: Message) -> None:
 
 @router.message(F.text == "📚 База знаний")
 async def reply_kb_knowledge(message: Message, user: User) -> None:
-    from aiogram.types import InlineKeyboardMarkup
 
     await message.answer(
         "📚 <b>База знаний</b>\n\nЗагрузите FAQ, цены, условия — бот будет отвечать клиентам по этим данным.",

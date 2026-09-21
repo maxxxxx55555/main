@@ -35,4 +35,4 @@ def build_system_prompt(knowledge: str | None = None, tz: str = "UTC") -> str:
         )
     else:
         knowledge_block = "База знаний бизнеса пока не заполнена — отвечай общими фразами и собирай контакт."
-    return SYSTEM_PROMPT.format(knowledge_block=knowledge_block, now_utc=dt.datetime.now(dt.timezone.utc).isoformat(timespec="minutes"))
+    return SYSTEM_PROMPT.format(knowledge_block=knowledge_block, now_utc=dt.datetime.now(dt.UTC).isoformat(timespec="minutes"))

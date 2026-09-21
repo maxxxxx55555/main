@@ -7,7 +7,6 @@ import datetime as dt
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models.base import utcnow
 from app.db.models.user import User
 from app.db.repo.users import UserRepo
 from app.services.billing.plans import PlanCatalog
