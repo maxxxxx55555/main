@@ -221,5 +221,23 @@ Once you have enough RVN in your wallet, you can:
 - Always keep your seed phrase safe and offline
 - Check https://ravencoin.com/ for official updates
 
+## Russian Card Withdrawal
+
+Yes, you can withdraw to a Russian bank card. See [WITHDRAW.md](./WITHDRAW.md) for full instructions.
+
+**Quick summary:**
+1. Mine RVN → transfer to Binance/Bybit/OKX
+2. Sell RVN for RUB
+3. Withdraw RUB to your Visa/Mastercard/Mir card
+4. Funds arrive in 1-3 business days
+
+**Legal status:** Mining and crypto trading are legal in Russia. Just use registered exchanges and declare income if over 5 million RUB/year.
+
+## Difficulty Assessment
+
+See [ONBOARDING.md](./ONBOARDING.md) for a realistic assessment.
+
+**Difficulty: 2/10** — much easier than most people think. setup.sh handles 90% of the work.
+
 ## License
 MIT
