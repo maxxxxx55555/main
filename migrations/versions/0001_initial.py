@@ -67,7 +67,6 @@ def upgrade() -> None:
         sa.Column("id", BigIntPk, primary_key=True, autoincrement=True),
         sa.Column("owner_id", BigIntPk, nullable=False),
         sa.Column("content", sa.Text(), nullable=False),
-        sa.Column("embedding", sa.LargeBinary(), nullable=False),
         sa.Column("tokens", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.ForeignKeyConstraint(["owner_id"], ["users.id"], ondelete="CASCADE"),

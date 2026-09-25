@@ -1,4 +1,4 @@
-"""Основной диалог с LLM: лимиты → контекст (+RAG) → провайдер → ответ."""
+"""Основной диалог с LLM: лимиты → контекст (+RAG) → провайдер → безопасный ответ."""
 
 from __future__ import annotations
 
@@ -8,8 +8,11 @@ from aiogram import F, Router
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
+from aiogram.utils.chat_action import ChatActionSender
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.bot import texts
+from app.bot.helpers import send_llm
 from app.bot.keyboards.inline import upsell_kb
 from app.config import Settings
 from app.db.models.user import User
@@ -24,10 +27,7 @@ from app.services.limits.usage import LimitExceeded, UsageService
 router = Router(name="chat")
 logger = logging.getLogger(__name__)
 
-LLM_DOWN = (
-    "😔 Сервис AI временно недоступен, попробуйте через несколько минут.\n"
-    "Ваш лимит не списан."
-)
+EMPTY_REPLY = "🤔 Мне нечего добавить по этому запросу. Попробуйте переформулировать вопрос."
 
 
 @router.message(F.text, StateFilter(None))
@@ -43,13 +43,10 @@ async def handle_chat(
     settings: Settings,
 ) -> None:
     assert message.text is not None
-    text = message.text
+    text = message.text.strip()
 
     if len(text) > settings.max_message_len:
-        await message.answer(
-            f"✋ Сообщение слишком длинное (максимум {settings.max_message_len} символов). "
-            "Разбейте его на части."
-        )
+        await message.answer(texts.message_too_long(settings.max_message_len))
         return
 
     # 1) Атомарное списание (§4.2); при отказе LLM — возврат (§8.3)
@@ -57,23 +54,27 @@ async def handle_chat(
         remaining = await usage.consume(session, user)
     except LimitExceeded as exc:
         await message.answer(
-            "🚧 Лимит сообщений на текущий период исчерпан.\n"
-            f"Лимит обновится {exc.reset_at.strftime('%d.%m.%Y')}.",
-            reply_markup=upsell_kb(catalog),
+            texts.limit_reached(exc.reset_at.strftime("%d.%m.%Y")),
+            reply_markup=upsell_kb(),
         )
         return
 
-    # 2) Сохраняем сообщение пользователя
-    await MessageRepo(session).add_message(user.id, "user", text)
+    # 2) Сохраняем сообщение пользователя (оно же войдёт в контекст следующего запроса)
+    repo = MessageRepo(session)
+    await repo.add_message(user.id, "user", text)
 
-    # 3) Контекст + RAG (только платные тарифы)
+    # 3) Контекст + RAG (база знаний — только на платных тарифах)
     knowledge_text = None
     if user.plan != "free":
-        chunks = await rag.retrieve(session, user.id, text)
+        try:
+            chunks = await rag.retrieve(session, user.id, text)
+        except Exception:  # сбой базы знаний не должен ломать чат (§8.3)
+            logger.exception("RAG retrieve failed for user_id=%s", user.id)
+            chunks = []
         if chunks:
             knowledge_text = "\n---\n".join(chunks)
 
-    history_rows = await MessageRepo(session).recent(user.id, settings.context_window)
+    history_rows = await repo.recent(user.id, settings.context_window)
     history = [(row.role, row.content) for row in history_rows]
     llm_messages = build_context(
         build_system_prompt(knowledge_text, user.tz),
@@ -84,25 +85,31 @@ async def handle_chat(
     if not llm_messages or llm_messages[-1].get("content") != text:
         llm_messages.append({"role": "user", "content": text})
 
-    # 4) Вызов LLM с graceful degradation
+    # 4) Вызов LLM: «печатает…» + graceful degradation (лимит не списывается при сбое)
     try:
-        reply = await provider.chat(llm_messages)
-    except LLMUnavailable:
-        logger.error("LLM unavailable for user_id=%s; usage refunded", user.id)
+        async with ChatActionSender.typing(bot=message.bot, chat_id=message.chat.id):
+            reply = await provider.chat(llm_messages)
+    except LLMUnavailable as exc:
+        logger.error("LLM unavailable for user_id=%s: %s; usage refunded", user.id, exc)
         await usage.refund(session, user)
-        await message.answer(LLM_DOWN)
+        await message.answer(texts.LLM_DOWN)
+        return
+    except Exception:  # любой сбой провайдера: возврат лимита + понятный ответ
+        logger.exception("Unexpected LLM error for user_id=%s; usage refunded", user.id)
+        await usage.refund(session, user)
+        await message.answer(texts.LLM_DOWN)
         return
 
     # 5) Сохраняем ответ + мягкие уведомления 80/100% (§4.4)
-    await MessageRepo(session).add_message(user.id, "assistant", reply.content, reply.tokens)
+    content = (reply.content or "").strip() or EMPTY_REPLY
+    await repo.add_message(user.id, "assistant", content, reply.tokens)
     limit = catalog.limit_for(user.plan)
     suffix = usage.warning_suffix(remaining, limit, user.period_reset_at)
-    await message.answer(reply.content[:4096 - len(suffix)] + suffix)
+    markup = upsell_kb() if suffix else None
+    await send_llm(message, content + suffix, reply_markup=markup)
 
 
 @router.message(StateFilter(None))
 async def not_a_text(message: Message) -> None:
-    """Фолбэк для фото/голоса/стикеров: бот понимает только текст."""
-    await message.answer(
-        "✋ Я пока понимаю только текстовые сообщения. Напишите вопрос текстом 🙂"
-    )
+    """Фолбэк для фото/голоса/стикеров: бот отвечает понятным текстом."""
+    await message.answer(texts.NOT_TEXT)

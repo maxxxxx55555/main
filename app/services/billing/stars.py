@@ -47,6 +47,11 @@ class StarsBillingService:
             return None
         return InvoiceIntent(plan=plan, user_tg_id=user_tg_id)
 
+    @staticmethod
+    def is_valid_payer(intent: InvoiceIntent, payer_tg_id: int) -> bool:
+        """Инвойс должен оплатить тот, для кого он выпущен (защита от подмены payload)."""
+        return intent.user_tg_id == payer_tg_id
+
     # --- 5.2.3 successful_payment: единственная точка активации ---
     async def activate(
         self,

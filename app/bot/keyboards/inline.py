@@ -8,12 +8,13 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from app.services.billing.plans import PlanCatalog
 
 
-def main_menu(catalog: PlanCatalog) -> InlineKeyboardMarkup:
+def main_menu() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.button(text="⭐️ Тарифы", callback_data="plans")
     kb.button(text="📚 База знаний", callback_data="knowledge")
     kb.button(text="ℹ️ Помощь", callback_data="help")
-    kb.adjust(2, 1)
+    kb.button(text="🔐 Приватность", callback_data="privacy")
+    kb.adjust(2, 2)
     return kb.as_markup()
 
 
@@ -29,10 +30,28 @@ def plans_kb(catalog: PlanCatalog) -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
-def upsell_kb(catalog: PlanCatalog) -> InlineKeyboardMarkup:
+def upsell_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.button(text="🚀 Перейти на PRO", callback_data="plans")
-    kb.button(text="🔄 Обновить лимит", callback_data="menu")
+    kb.button(text="⬅️ В меню", callback_data="menu")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def help_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="💬 Как задать вопрос", callback_data="ask_hint")
+    kb.button(text="📚 База знаний", callback_data="knowledge")
+    kb.button(text="⭐️ Тарифы", callback_data="plans")
+    kb.button(text="🔐 Приватность", callback_data="privacy")
+    kb.adjust(2, 2)
+    return kb.as_markup()
+
+
+def privacy_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🗑 Удалить все данные", callback_data="forget_me")
+    kb.button(text="⬅️ В меню", callback_data="menu")
     kb.adjust(1)
     return kb.as_markup()
 

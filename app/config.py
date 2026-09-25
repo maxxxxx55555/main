@@ -12,6 +12,19 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Пресеты бесплатных LLM-провайдеров ($0/мес): provider → (base_url, model).
+# Явные LLM_BASE_URL / LLM_MODEL в .env всегда имеют приоритет над пресетом.
+LLM_PRESETS: dict[str, tuple[str, str]] = {
+    "groq": ("https://api.groq.com/openai/v1", "llama-3.3-70b-versatile"),
+    "openrouter": ("https://openrouter.ai/api/v1", "meta-llama/llama-3.1-8b-instruct:free"),
+    "openai": ("https://api.openai.com/v1", "gpt-4o-mini"),
+    "glm": ("https://open.bigmodel.cn/api/paas/v4", "glm-4.5"),
+}
+_DEFAULT_PRESET = LLM_PRESETS["groq"]
+
+# Абсолютный путь: SQLite-файл не зависит от текущего каталога запуска (Docker/workers).
+DEFAULT_DATABASE_URL = f"sqlite+aiosqlite:///{(BASE_DIR / 'data' / 'bot.db').as_posix()}"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -25,7 +38,7 @@ class Settings(BaseSettings):
     bot_token: str = ""
 
     # --- Database / cache ---
-    database_url: str = "sqlite+aiosqlite:///./data/bot.db"
+    database_url: str = DEFAULT_DATABASE_URL
     redis_url: str | None = None
 
     # --- LLM ($0-стек: бесплатные провайдеры через OpenAI-совместимый API) ---
@@ -72,6 +85,8 @@ class Settings(BaseSettings):
     max_message_len: int = 4000
     admin_ids: str = ""
     default_tz: str = "UTC"
+    support_username: str = ""  # @username поддержки (показывается в /help и ошибках)
+    retention_days: int = 90  # хранение истории сообщений (0 = отключено)
 
     # --- Webhook (prod) / health ---
     webhook_mode: bool = False  # False = long polling (dev), True = webhook (prod)
@@ -95,27 +110,20 @@ class Settings(BaseSettings):
         """Mock-режим: без ключа или принудительно через LLM_MOCK=1."""
         return self.llm_mock or not self.llm_api_key.strip()
 
-    # Пресеты бесплатных LLM-провайдеров ($0/мес)
-    LLM_PRESETS: dict[str, tuple[str, str]] = {
-        "groq": ("https://api.groq.com/openai/v1", "llama-3.3-70b-versatile"),
-        "openrouter": ("https://openrouter.ai/api/v1", "meta-llama/llama-3.1-8b-instruct:free"),
-        "openai": ("https://api.openai.com/v1", "gpt-4o-mini"),
-        "glm": ("https://open.bigmodel.cn/api/paas/v4", "glm-4.5"),
-    }
-
+    # Пресеты LLM-провайдеров — модульная константа LLM_PRESETS (см. начало файла).
     @property
     def resolved_llm_base_url(self) -> str:
         if self.llm_base_url.strip():
             return self.llm_base_url
-        preset = self.LLM_PRESETS.get(self.llm_provider.strip().lower())
-        return preset[0] if preset else self.LLM_PRESETS["groq"][0]
+        preset = LLM_PRESETS.get(self.llm_provider.strip().lower())
+        return preset[0] if preset else _DEFAULT_PRESET[0]
 
     @property
     def resolved_llm_model(self) -> str:
         if self.llm_model.strip():
             return self.llm_model
-        preset = self.LLM_PRESETS.get(self.llm_provider.strip().lower())
-        return preset[1] if preset else self.LLM_PRESETS["groq"][1]
+        preset = LLM_PRESETS.get(self.llm_provider.strip().lower())
+        return preset[1] if preset else _DEFAULT_PRESET[1]
 
 
 @lru_cache

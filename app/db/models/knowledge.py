@@ -1,15 +1,17 @@
-"""База знаний (RAG v2).
+"""База знаний (RAG).
 
-SQLite (dev): embedding — BLOB (float32 little-endian), ANN = линейный
-перебор с косинусной близостью в Python (приемлемо на dev-объёмах).
-PostgreSQL (prod): колонка заменяется на pgvector `vector(EMBEDDING_DIM)`
-с HNSW-индексом — см. docs/ARCHITECTURE.md §3. Код сервисов одинаков.
+Чанки текста хранятся в `knowledge_base`; поиск:
+- SQLite (по умолчанию, $0): лексический BM25-lite в Python — без внешних сервисов
+  (см. services/ai/scoring.py);
+- ChromaDB (`VECTOR_STORE=chroma`): семантический поиск локальной ONNX-моделью
+  (работает и с LLM без embeddings API: Groq/OpenRouter) — см. services/ai/vector_store.py.
+
+При масштабировании — PostgreSQL + pgvector (docs/ARCHITECTURE.md §3, §10).
 """
 
 import datetime as dt
-import struct
 
-from sqlalchemy import BLOB, DateTime, ForeignKey, Integer, Text
+from sqlalchemy import DateTime, ForeignKey, Integer, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.models.base import Base, utcnow
@@ -24,28 +26,7 @@ class KnowledgeBase(Base):
         BigIntPk, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    embedding: Mapped[bytes] = mapped_column(BLOB, nullable=False)
     tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
-
-
-def encode_vector(values: list[float]) -> bytes:
-    return struct.pack(f"<{len(values)}f", *values)
-
-
-def decode_vector(blob: bytes) -> list[float]:
-    n = len(blob) // 4
-    return list(struct.unpack(f"<{n}f", blob[: n * 4]))
-
-
-def cosine_similarity(a: list[float], b: list[float]) -> float:
-    if not a or not b or len(a) != len(b):
-        return 0.0
-    dot = sum(x * y for x, y in zip(a, b, strict=True))
-    na = sum(x * x for x in a) ** 0.5
-    nb = sum(x * x for x in b) ** 0.5
-    if na == 0 or nb == 0:
-        return 0.0
-    return dot / (na * nb)

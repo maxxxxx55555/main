@@ -1,124 +1,123 @@
-"""/start, /help, /stats — онбординг и статус лимитов."""
+"""/start, /help, /stats — онбординг, справка и статус лимитов."""
 
 from __future__ import annotations
 
+import logging
+
 from aiogram import F, Router
-from aiogram.filters import Command, CommandStart
+from aiogram.filters import Command, CommandObject, CommandStart
+from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.bot.keyboards.inline import main_menu
+from app.bot import texts
+from app.bot.helpers import safe_edit, send_authored
+from app.bot.keyboards.inline import forget_confirm_kb, help_kb, main_menu
+from app.bot.keyboards.reply import quick_actions
 from app.config import Settings
 from app.db.models.user import User
+from app.db.repo.knowledge import KnowledgeRepo
 from app.db.repo.messages import MessageRepo
-from app.db.repo.users import UserRepo
+from app.services.ai.rag import RagService
 from app.services.billing.plans import PlanCatalog
-from app.services.limits.usage import UsageService
 
 router = Router(name="start")
-
-WELCOME = (
-    "👋 Привет, {name}!\n\n"
-    "Я — <b>AI-Сотрудник</b>: отвечаю вашим клиентам 24/7, квалифицирую лидов, "
-    "записываю на консультации и не даю потерять ни одну заявку.\n\n"
-    "Просто напишите мне вопрос — как будто это тестовый клиент. "
-    "А чтобы я отвечал от лица вашего бизнеса, загрузите базу знаний (FAQ, цены, условия) в разделе «📚 База знаний».\n\n"
-    "💡 <b>30 сообщений в месяц — бесплатно</b>, без карты. На PRO (⭐100) — 500 сообщений "
-    "+ база знаний: я отвечаю строго как сотрудник именно вашего бизнеса.\n\n"
-    "⚠️ <i>Ваши сообщения передаются LLM-провайдеру для генерации ответов.</i>"
-)
-
-HELP = (
-    "<b>Команды:</b>\n"
-    "/start — начать работу\n"
-    "/help — эта справка\n"
-    "/stats — остаток лимита и тариф\n"
-    "/buy — тарифы и оплата (Telegram Stars)\n"
-    "/knowledge — база знаний (PRO/Business)\n"
-    "/forget_me — удалить все мои данные\n\n"
-    "<b>Как это работает:</b> напишите сообщение — я отвечу как AI-ассистент "
-    "вашего бизнеса. Лимит бесплатного тарифа обновляется каждые 30 дней."
-)
+logger = logging.getLogger(__name__)
 
 
 @router.message(CommandStart())
 async def cmd_start(
     message: Message,
+    command: CommandObject,
     user: User,
     catalog: PlanCatalog,
     session: AsyncSession,
 ) -> None:
-    await UserRepo(session).get_or_create(user.tg_id, user.tz)
+    await session.refresh(user)  # актуальный лимит после возможного ленивого сброса
     name = message.from_user.first_name if message.from_user else "друг"
-    await message.answer(
-        WELCOME.format(name=name),
-        reply_markup=main_menu(catalog),
+    if command.args:
+        # Deeplink-метки (`?start=camp1`) — бесплатная аналитика источников трафика
+        logger.info("Старт по deeplink: payload=%r user_id=%s", command.args[:64], user.id)
+    await send_authored(
+        message,
+        texts.welcome(name, catalog),
+        reply_markup=quick_actions(),
     )
 
 
 @router.message(Command("help"))
 @router.callback_query(F.data == "help")
-async def cmd_help(event: Message | CallbackQuery) -> None:
-    text = HELP
+async def cmd_help(event: Message | CallbackQuery, settings: Settings) -> None:
+    text = texts.help_text(settings)
     if isinstance(event, CallbackQuery):
-        await event.message.edit_text(text)
+        await safe_edit(event.message, text, reply_markup=help_kb())
         await event.answer()
     else:
-        await event.answer(text)
+        await send_authored(event, text, reply_markup=help_kb())
 
 
 @router.message(Command("stats"))
 async def cmd_stats(
-    message: Message, user: User, catalog: PlanCatalog, usage: UsageService, settings: Settings
+    message: Message,
+    user: User,
+    catalog: PlanCatalog,
+    session: AsyncSession,
 ) -> None:
+    await session.refresh(user)
     limit = catalog.limit_for(user.plan)
     remaining = max(limit - user.messages_used, 0)
     plan = catalog.get(user.plan)
-    await message.answer(
-        "📊 <b>Ваш статус</b>\n"
-        f"Тариф: <b>{plan.title if plan else user.plan}</b>\n"
-        f"Лимит: {user.messages_used}/{limit} сообщений использовано\n"
-        f"Осталось: <b>{remaining}</b>\n"
-        f"Обновление лимита: {user.period_reset_at.strftime('%d.%m.%Y %H:%M UTC')}\n\n"
-        "Апгрейд: /buy"
-    )
+    chunks = await KnowledgeRepo(session).count_for_owner(user.id)
+    percent = round(user.messages_used / limit * 100) if limit else 0
+
+    lines = [
+        "📊 <b>Ваш статус</b>",
+        f"Тариф: <b>{plan.title if plan else user.plan}</b>",
+        f"Лимит: {user.messages_used}/{limit} сообщений использовано ({percent}%)",
+        f"Осталось: <b>{remaining}</b>",
+        f"Обновление лимита: {user.period_reset_at.strftime('%d.%m.%Y %H:%M UTC')}",
+    ]
+    if user.plan != "free":
+        lines.append(f"База знаний: {chunks} фрагментов")
+    lines.append("")
+    lines.append("Апгрейд и продление: /buy" if user.plan != "free" else "Апгрейд: /buy")
+    await message.answer("\n".join(lines))
 
 
 @router.callback_query(F.data == "menu")
-async def cb_menu(callback: CallbackQuery, catalog: PlanCatalog, state=None) -> None:
-    if state is not None:
-        await state.clear()
-    if callback.message is not None:
-        await callback.message.edit_text("Главное меню 👇", reply_markup=main_menu(catalog))
+async def cb_menu(callback: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+    await safe_edit(callback.message, "Главное меню 👇", reply_markup=main_menu())
     await callback.answer()
 
 
 @router.callback_query(F.data == "forget_me")
-async def cb_forget(
-    callback: CallbackQuery, session: AsyncSession, user: User, settings: Settings
-) -> None:
-    from app.bot.keyboards.inline import forget_confirm_kb
-
-    if callback.message is not None:
-        await callback.message.edit_text(
-            "⚠️ Удалить <b>все</b> ваши данные: профиль, историю диалогов, базу знаний?\n"
-            "Действие необратимо.",
-            reply_markup=forget_confirm_kb(),
-        )
+async def cb_forget(callback: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+    await safe_edit(
+        callback.message,
+        "⚠️ Удалить <b>все</b> ваши данные: профиль, историю диалогов, базу знаний?\n"
+        "Действие необратимо.",
+        reply_markup=forget_confirm_kb(),
+    )
     await callback.answer()
 
 
 @router.callback_query(F.data == "forget_confirm")
 async def cb_forget_confirm(
-    callback: CallbackQuery, session: AsyncSession, user: User, rag=None
+    callback: CallbackQuery,
+    session: AsyncSession,
+    user: User,
+    rag: RagService | None = None,
 ) -> None:
-    await MessageRepo(session).delete_history(user.id)
+    user_id = user.id
+    await MessageRepo(session).delete_history(user_id)
     if rag is not None:
-        await rag.forget_owner(session, user.id)  # SQLite и/или ChromaDB
+        await rag.forget_owner(session, user_id)  # SQLite и/или ChromaDB
     else:
-        from app.db.repo.knowledge import KnowledgeRepo
-
-        await KnowledgeRepo(session).delete_for_owner(user.id)
+        await KnowledgeRepo(session).delete_for_owner(user_id)
     await session.delete(user)
-    await callback.message.edit_text("🗑 Все ваши данные удалены. Введите /start, чтобы начать заново.")
-    await callback.answer()
+    await session.flush()
+    logger.info("Пользователь удалил все данные: user_id=%s", user_id)
+    await safe_edit(callback.message, "🗑 Все ваши данные удалены. Введите /start, чтобы начать заново.")
+    await callback.answer("Данные удалены")

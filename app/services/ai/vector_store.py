@@ -1,10 +1,10 @@
-"""Векторные хранилища базы знаний (RAG) — оба варианта локальные и бесплатные.
+"""Векторные/текстовые хранилища базы знаний (RAG) — оба варианта локальные и бесплатные.
 
-- SQLiteVectorStore (по умолчанию): чанки + BLOB-эмбеддинги в основной БД,
-  косинусный поиск в Python. Зависимостей нет.
+- SQLiteVectorStore (по умолчанию): чанки в основной БД, поиск — лексический
+  BM25-lite в Python (services/ai/scoring.py). Ноль зависимостей и внешних вызовов.
 - ChromaVectorStore (VECTOR_STORE=chroma): локальный ChromaDB в ./chroma_db.
-  Использует встроенную локальную embedding-функцию Chroma (ONNX, скачивается
-  один раз) — работает даже с LLM без embeddings API (Groq/OpenRouter).
+  Семантический поиск встроенной локальной embedding-моделью Chroma (ONNX,
+  скачивается один раз) — работает даже с LLM без embeddings API (Groq/OpenRouter).
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ class VectorStore(Protocol):
 
 
 class SQLiteVectorStore:
-    """Встроенное хранилище: таблица knowledge_base + cosine-поиск (без зависимостей)."""
+    """Встроенное хранилище: таблица knowledge_base + BM25-lite (без зависимостей)."""
 
     def __init__(self, session, settings: Settings) -> None:
         self._session = session
@@ -31,25 +31,16 @@ class SQLiteVectorStore:
 
     async def add(self, owner_id: int, chunks: list[str]) -> int:
         from app.db.repo.knowledge import KnowledgeRepo
-        from app.services.ai.provider import MockProvider
 
-        provider = MockProvider(embedding_dim=self._settings.embedding_dim)
-        embeddings = await provider.embed(chunks)
         repo = KnowledgeRepo(self._session)
-        for chunk, emb in zip(chunks, embeddings, strict=True):
-            await repo.add_chunk(owner_id, chunk, emb)
+        for chunk in chunks:
+            await repo.add_chunk(owner_id, chunk)
         return len(chunks)
 
     async def search(self, owner_id: int, query: str, top_k: int) -> list[str]:
         from app.db.repo.knowledge import KnowledgeRepo
-        from app.services.ai.provider import MockProvider
 
-        repo = KnowledgeRepo(self._session)
-        if not await repo.for_owner(owner_id):
-            return []
-        provider = MockProvider(embedding_dim=self._settings.embedding_dim)
-        q = (await provider.embed([query]))[0]
-        rows = await repo.search(owner_id, q, top_k=top_k)
+        rows = await KnowledgeRepo(self._session).search(owner_id, query, top_k=top_k)
         return [row.content for row in rows]
 
     async def delete_for_owner(self, owner_id: int) -> int:
@@ -60,7 +51,7 @@ class SQLiteVectorStore:
     async def count(self, owner_id: int) -> int:
         from app.db.repo.knowledge import KnowledgeRepo
 
-        return len(await KnowledgeRepo(self._session).for_owner(owner_id))
+        return await KnowledgeRepo(self._session).count_for_owner(owner_id)
 
 
 class ChromaVectorStore:

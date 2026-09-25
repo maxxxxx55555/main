@@ -18,7 +18,7 @@ def test_app_assembles(settings):
     rag = RagService(build_provider(settings), settings)
 
     router = build_router()
-    assert len(router.sub_routers) == 5  # payments, admin, start, knowledge, chat
+    assert len(router.sub_routers) == 6  # payments, admin, start, knowledge, menu, chat
 
     # Инварианты каталога (§4.1)
     assert catalog.get("free").price_stars == 0

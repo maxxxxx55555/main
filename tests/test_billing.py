@@ -44,6 +44,15 @@ def test_validate_payload_malformed(settings):
     assert billing.validate_payload("buy:pro:notanumber", 100) is None
 
 
+def test_is_valid_payer_blocks_foreign_invoice(settings):
+    """Инвойс, выпущенный для другого пользователя, оплатить нельзя (§5.2.2)."""
+    billing = StarsBillingService(PlanCatalog(settings), settings)
+    intent = billing.validate_payload("buy:pro:12345", 100)
+    assert intent is not None
+    assert billing.is_valid_payer(intent, 12345) is True
+    assert billing.is_valid_payer(intent, 99999) is False
+
+
 async def test_activate_is_idempotent(session, settings):
     billing = StarsBillingService(PlanCatalog(settings), settings)
     user = await UserRepo(session).get_or_create(1)
