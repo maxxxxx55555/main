@@ -1,0 +1,47 @@
+[Unit]
+Description=Ravencoin Miner (T-Rex)
+After=network.target
+
+[Service]
+Type=simple
+User=miner
+Group=miner
+WorkingDirectory=/opt/trex
+EnvironmentFile=/etc/miner/config/.env
+
+# Environment variables for T-Rex
+Environment=API_PORT=4068
+
+# Start command
+# -a kawpow: KawPow algorithm (Ravencoin)
+# -u: wallet address from .env
+# -p: pool password from .env
+# -w: worker name from .env
+# --api: enable API for monitoring
+# -d: dev mode (more detailed stats)
+ExecStart=/opt/trex/trex -a kawpow -u ${WALLET_ADDRESS} -p ${POOL_PASSWORD} -w ${WORKER_NAME} --api-port ${API_PORT} -d ${EXTRA_FLAGS} ${POOL_URL}
+
+# Restart policy
+Restart=always
+RestartSec=10
+StartLimitInterval=300
+StartLimitBurst=5
+
+# Resource limits (adjust based on your system)
+MemoryMax=8G
+CPUQuota=800%
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=miner
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/miner /opt/trex
+
+[Install]
+WantedBy=multi-user.target
