@@ -155,6 +155,36 @@ async def test_non_text_message_gets_friendly_answer(engine, settings):
     assert texts and "текстовые сообщения" in texts[0]
 
 
+async def test_reply_button_opens_knowledge_with_chunk_count(engine, settings):
+    """Reply-кнопка «📚 База знаний» показывает экран со счётчиком фрагментов."""
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    from app.db.repo.users import UserRepo
+    from app.services.ai.provider import MockProvider
+    from app.services.ai.rag import RagService
+
+    dp, bot, session = await _make_dispatcher(engine, settings)
+
+    # Готовим Pro-пользователя с одним чанком базы знаний
+    maker = async_sessionmaker(engine, expire_on_commit=False)
+    async with maker() as db:
+        user = await UserRepo(db).get_or_create(778)
+        user.plan = "pro"
+        await db.flush()
+        rag = RagService(MockProvider(embedding_dim=settings.embedding_dim), settings)
+        await rag.add_text(db, user.id, "Мы кофейня. Капучино — 250 рублей.")
+        await db.commit()
+
+    from app.bot.keyboards.reply import BTN_KNOWLEDGE
+
+    await dp.feed_update(bot, _text_update(BTN_KNOWLEDGE, update_id=10, user_id=778))
+
+    joined = "\n".join(session.sent_texts())
+    assert "База знаний" in joined
+    assert "Загружено фрагментов: <b>1</b>" in joined
+    assert "Подключите в PRO" not in joined
+
+
 async def test_help_and_privacy_commands(engine, settings):
     dp, bot, session = await _make_dispatcher(engine, settings)
     await dp.feed_update(bot, _text_update("/help", update_id=1))

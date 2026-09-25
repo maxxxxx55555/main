@@ -34,7 +34,7 @@ git clone <repo> && cd bot
 python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt   # Windows; Linux/macOS: .venv/bin/pip ...
 copy .env.example .env                          # вписать BOT_TOKEN от @BotFather
-.venv\Scripts\pytest -q                         # 88 тестов: зелёные без LLM-ключа
+.venv\Scripts\pytest -q                         # 91 тест: зелёные без LLM-ключа
 .venv\Scripts\python -m app.main                # запуск бота (LLM в mock-режиме)
 ```
 
@@ -92,7 +92,7 @@ docker compose --profile prod up -d --build
 ## Тесты
 
 ```bash
-pytest -q                                    # 88 тестов: лимиты, биллинг, RAG, роутеры, интеграция
+pytest -q                                    # 91 тест: лимиты, биллинг, RAG, роутеры, интеграция
 ruff check app migrations tests              # линтер
 python -m compileall -q app migrations tests  # синтаксическая проверка
 ```

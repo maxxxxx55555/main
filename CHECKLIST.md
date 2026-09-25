@@ -2,7 +2,7 @@
 
 ## Проверки текущего состояния (25.09.2026)
 
-- [x] `.venv\Scripts\python.exe -m pytest -q` → **88 passed**
+- [x] `.venv\Scripts\python.exe -m pytest -q` → **91 passed**
 - [x] `.venv\Scripts\python.exe -m ruff check app migrations tests` → **All checks passed**
 - [x] `.venv\Scripts\python.exe -m compileall -q app migrations tests` → без ошибок компиляции
 - [x] Alembic на отдельной SQLite-БД: `upgrade head → downgrade base → upgrade head` → все три команды завершились с кодом 0
@@ -12,7 +12,7 @@
 
 ## Локально (5 минут)
 
-- [ ] `pytest -q` → **88 passed**
+- [ ] `pytest -q` → **91 passed**
 - [ ] `.venv/Scripts/python -m app.main` стартует, в логе нет traceback
 - [ ] `curl http://localhost:8080/health` → `{"status": "ok"}`
 - [ ] В Telegram: `/start` → приветствие с меню

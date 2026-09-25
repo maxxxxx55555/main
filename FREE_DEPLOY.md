@@ -33,7 +33,7 @@
    ```bash
    python -m venv .venv
    .venv\Scripts\pip install -r requirements.txt     # Linux/macOS: .venv/bin/pip install -r requirements.txt
-   .venv\Scripts\pytest -q                           # 88 passed
+   .venv\Scripts\pytest -q                           # 91 passed
    ```
 
 ---
