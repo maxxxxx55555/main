@@ -39,23 +39,21 @@ cp .env.example .env
 nano .env  # Replace WALLET_ADDRESS with your RVN address
 
 # Run setup (requires sudo)
+# This will: update system, install NVIDIA driver, create miner user,
+# install T-Rex, configure systemd service, set GPU limits, enable firewall, install watchdog cron
 sudo bash setup.sh
 ```
 
-## Step 4b: Enable Firewall and Watchdog (2 min)
-After setup completes, enable security:
-```bash
-# Enable firewall
-sudo ufw enable
-sudo ufw allow ssh
-sudo ufw allow 4444
-sudo ufw allow 4068
+**Setup.sh does everything automatically:**
+- Installs NVIDIA driver if needed
+- Creates non-root `miner` user
+- Downloads T-Rex miner from GitHub
+- Configures systemd service (autostart on boot)
+- Sets GPU power/temp limits
+- Enables firewall (SSH + miner ports)
+- Installs watchdog cron (checks every 5 minutes)
 
-# Enable watchdog cron (runs every 5 minutes)
-sudo crontab -e
-# Add this line:
-*/5 * * * * /bin/bash /opt/my-mining-server/scripts/watchdog.sh >> /var/log/miner/watchdog-cron.log 2>&1
-```
+No manual firewall or cron setup needed — it's all automated.
 
 ## Step 5: Start Mining
 ```bash

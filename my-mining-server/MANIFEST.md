@@ -48,12 +48,24 @@ cd main/my-mining-server
 cp .env.example .env
 nano .env
 
-# 3. Run setup
+# 3. Run setup (does everything: driver, T-Rex, systemd, firewall, cron, GPU limits)
 sudo bash setup.sh
 
 # 4. Start miner
 sudo systemctl start miner
 ```
+
+## What setup.sh Does (10 Steps)
+1. Updates system packages
+2. Installs NVIDIA driver if needed
+3. Creates non-root `miner` user
+4. Downloads and installs T-Rex miner
+5. Creates config directories and copies scripts to /opt/my-mining-server
+6. Copies .env.example to /etc/miner/config/.env
+7. Installs and enables systemd service (autostart on boot)
+8. Applies GPU power/temp limits
+9. Configures firewall (SSH + ports 4444, 4068)
+10. Installs watchdog cron (runs every 5 minutes)
 
 ## Management Commands
 ```bash
@@ -68,24 +80,9 @@ sudo journalctl -u miner -f   # View logs
 
 ## Monitoring Commands
 ```bash
-sudo bash scripts/watchdog.sh  # Run watchdog check
+sudo bash /opt/my-mining-server/scripts/watchdog.sh  # Run watchdog check
 nvidia-smi                     # GPU status
 curl http://localhost:4068/api/v1/status  # Miner API
-```
-
-## Cron Setup
-```bash
-# Install watchdog cron (runs every 5 minutes)
-sudo crontab -e
-# Add this line:
-*/5 * * * * /bin/bash /opt/my-mining-server/scripts/watchdog.sh >> /var/log/miner/watchdog-cron.log 2>&1
-```
-
-## Firewall Setup
-```bash
-sudo ufw enable
-sudo ufw allow ssh
-sudo ufw allow 4444
-sudo ufw allow 4068
-sudo ufw default deny incoming
+sudo ufw status                # Check firewall rules
+sudo crontab -l                # Check watchdog cron entry
 ```
