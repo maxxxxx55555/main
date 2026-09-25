@@ -233,6 +233,12 @@ Yes, you can withdraw to a Russian bank card. See [WITHDRAW.md](./WITHDRAW.md) f
 
 **Legal status:** Mining and crypto trading are legal in Russia. Just use registered exchanges and declare income if over 5 million RUB/year.
 
+## Without IP / Without Self-Employment
+
+**Yes, you can mine and withdraw WITHOUT registering an IP (ИП) or self-employment (самозанятость).** See [WITHOUT_IP.md](./WITHOUT_IP.md) for full details.
+
+**Bottom line:** As a regular citizen (физлицо), you can mine, sell on Binance, and withdraw to your card. No IP needed. No self-employment needed. Only declare taxes if annual income exceeds 5 million RUB.
+
 ## Difficulty Assessment
 
 See [ONBOARDING.md](./ONBOARDING.md) for a realistic assessment.
