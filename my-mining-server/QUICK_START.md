@@ -42,6 +42,21 @@ nano .env  # Replace WALLET_ADDRESS with your RVN address
 sudo bash setup.sh
 ```
 
+## Step 4b: Enable Firewall and Watchdog (2 min)
+After setup completes, enable security:
+```bash
+# Enable firewall
+sudo ufw enable
+sudo ufw allow ssh
+sudo ufw allow 4444
+sudo ufw allow 4068
+
+# Enable watchdog cron (runs every 5 minutes)
+sudo crontab -e
+# Add this line:
+*/5 * * * * /bin/bash /opt/my-mining-server/scripts/watchdog.sh >> /var/log/miner/watchdog-cron.log 2>&1
+```
+
 ## Step 5: Start Mining
 ```bash
 sudo systemctl start miner

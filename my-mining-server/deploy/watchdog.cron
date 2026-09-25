@@ -1,0 +1,4 @@
+# Mining Watchdog - run every 5 minutes via cron
+# Add to root crontab: crontab -e
+# This checks if the miner is running and logs status
+*/5 * * * * /bin/bash /opt/my-mining-server/scripts/watchdog.sh >> /var/log/miner/watchdog-cron.log 2>&1

@@ -127,6 +127,28 @@ sudo ls -la /etc/miner/config/
 - Check firewall: `sudo ufw status`
 - Verify pool URL in config
 
+## Firewall Setup
+
+Enable firewall and open only necessary ports:
+```bash
+sudo ufw enable
+sudo ufw allow ssh
+sudo ufw allow 4444    # Mining pool port
+sudo ufw allow 4068    # T-Rex API port
+sudo ufw default deny incoming
+```
+
+## Cron Setup (Watchdog)
+
+The watchdog script runs every 5 minutes to check miner health:
+```bash
+# Edit root crontab
+sudo crontab -e
+
+# Add this line:
+*/5 * * * * /bin/bash /opt/my-mining-server/scripts/watchdog.sh >> /var/log/miner/watchdog-cron.log 2>&1
+```
+
 ## Security
 
 - Miner runs as non-root `miner` user
@@ -134,6 +156,7 @@ sudo ls -la /etc/miner/config/
 - Firewall enabled (only SSH + miner ports)
 - No hardcoded credentials in code
 - T-Rex binary from official GitHub releases
+- Full security checklist: see SECURITY.md
 
 ## Backup
 

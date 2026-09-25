@@ -9,16 +9,16 @@ Group=miner
 WorkingDirectory=/opt/trex
 EnvironmentFile=/etc/miner/config/.env
 
-# Environment variables for T-Rex
-Environment=API_PORT=4068
-
 # Start command
-# -a kawpow: KawPow algorithm (Ravencoin)
-# -u: wallet address from .env
-# -p: pool password from .env
-# -w: worker name from .env
-# --api: enable API for monitoring
-# -d: dev mode (more detailed stats)
+# T-Rex flags:
+#   -a kawpow  : KawPow algorithm (Ravencoin)
+#   -u         : wallet address from .env
+#   -p         : pool password from .env
+#   -w         : worker name from .env
+#   --api-port : API port for monitoring
+#   -d         : dev mode (detailed stats)
+#   ${EXTRA_FLAGS} : additional flags (can be empty)
+#   ${POOL_URL} : pool address
 ExecStart=/opt/trex/trex -a kawpow -u ${WALLET_ADDRESS} -p ${POOL_PASSWORD} -w ${WORKER_NAME} --api-port ${API_PORT} -d ${EXTRA_FLAGS} ${POOL_URL}
 
 # Restart policy

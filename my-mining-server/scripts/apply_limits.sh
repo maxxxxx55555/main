@@ -1,12 +1,14 @@
 #!/bin/bash
 # Apply GPU power and temperature limits via nvidia-smi
 # Safe defaults: 85% power, 70°C target
-# Run as: sudo bash scripts/apply_limits.sh
+# Run as: sudo bash /opt/my-mining-server/scripts/apply_limits.sh
 
 set -e
 
-# Load config
-source /etc/miner/config/.env 2>/dev/null || true
+# Load config if available
+if [ -f /etc/miner/config/.env ]; then
+    source /etc/miner/config/.env 2>/dev/null || true
+fi
 
 POWER_LIMIT=${POWER_LIMIT:-85}
 TEMP_TARGET=${TEMP_TARGET:-70}
@@ -14,6 +16,12 @@ TEMP_TARGET=${TEMP_TARGET:-70}
 echo "=== Applying GPU Limits ==="
 echo "Power Limit: ${POWER_LIMIT}%"
 echo "Temperature Target: ${TEMP_TARGET}°C"
+
+# Check if nvidia-smi is available
+if ! command -v nvidia-smi &> /dev/null; then
+    echo "ERROR: nvidia-smi not found. Is the NVIDIA driver installed?"
+    exit 1
+fi
 
 # Get number of GPUs
 GPU_COUNT=$(nvidia-smi --query-gpu=count --format=csv,noheader,nounits | head -1)

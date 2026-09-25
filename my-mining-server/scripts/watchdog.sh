@@ -1,28 +1,30 @@
 #!/bin/bash
 # Mining Watchdog Script
 # Monitors: miner process, GPU temperature, hashrate
-# Run as: miner user (via cron or systemd timer)
+# Run as: root via cron (systemctl restart requires root)
+# systemd service already has Restart=always for crash recovery
 
 set -e
 
-# Load config
-source /etc/miner/config/.env 2>/dev/null || true
-
-API_PORT=${API_PORT:-4068}
-TEMP_TARGET=${TEMP_TARGET:-70}
-POWER_LIMIT=${POWER_LIMIT:-85}
-WORKER_NAME=${WORKER_NAME:-worker1}
-
-LOG_FILE=/var/log/miner/watchdog.log
-PID_FILE=/var/run/miner.pid
+# Paths
+SCRIPT_DIR="/opt/my-mining-server"
+LOG_FILE="/var/log/miner/watchdog.log"
 
 # Ensure log directory exists
 mkdir -p /var/log/miner
-touch $LOG_FILE
+touch "$LOG_FILE"
 
 log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a $LOG_FILE
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
 }
+
+# Load config if available
+if [ -f /etc/miner/config/.env ]; then
+    source /etc/miner/config/.env 2>/dev/null || true
+fi
+
+API_PORT=${API_PORT:-4068}
+TEMP_TARGET=${TEMP_TARGET:-70}
 
 # Check if miner process is running
 check_miner_process() {
@@ -73,7 +75,7 @@ log "=== Watchdog Check ==="
 if check_miner_process; then
     log "Miner process: RUNNING"
 else
-    log "WARNING: Miner process NOT RUNNING"
+    log "WARNING: Miner process NOT RUNNING - systemd will auto-restart (Restart=always)"
 fi
 
 # Check GPU temperature
@@ -84,27 +86,16 @@ if [ "$MAX_TEMP" -gt "$TEMP_TARGET" ]; then
     log "WARNING: GPU temperature exceeds target (${TEMP_TARGET}°C)"
 fi
 
+if [ "$MAX_TEMP" -gt 85 ]; then
+    log "WARNING: GPU temperature high (${MAX_TEMP}°C) - check cooling"
+fi
+
 # Check hashrate
 HASHRATE=$(check_hashrate)
 log "Hashrate: ${HASHRATE} H/s"
 
-# Check if we need to restart the miner
-RESTART_NEEDED=false
-
-if ! check_miner_process; then
-    log "ACTION: Restarting miner service..."
-    systemctl restart miner
-    RESTART_NEEDED=true
-fi
-
-if [ "$MAX_TEMP" -gt 90 ]; then
-    log "CRITICAL: GPU temperature critical (${MAX_TEMP}°C), restarting miner..."
-    systemctl restart miner
-    RESTART_NEEDED=true
-fi
-
-if [ "$RESTART_NEEDED" = false ]; then
-    log "All systems nominal."
+if [ "$HASHRATE" = "0" ] || [ -z "$HASHRATE" ]; then
+    log "WARNING: Could not read hashrate from API"
 fi
 
 log "=== Watchdog Check Complete ==="
