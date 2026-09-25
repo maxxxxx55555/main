@@ -185,6 +185,44 @@ async def test_reply_button_opens_knowledge_with_chunk_count(engine, settings):
     assert "Подключите в PRO" not in joined
 
 
+async def test_pro_user_at_limit_gets_no_pro_upsell(engine, settings):
+    """Платный юзер при исчерпании лимита: /buy-подсказка без PRO-CTA.
+
+    Регрессия UX-аудита: upsell «Перейти на PRO» показывался и PRO/Business —
+    кнопка вела в никуда для тех, кто уже платит.
+    """
+    dp, bot, session = await _make_dispatcher(engine, settings)
+
+    maker = async_sessionmaker(engine, expire_on_commit=False)
+    async with maker() as db:
+        user = await UserRepo(db).get_or_create(779)
+        user.plan = "pro"
+        user.messages_used = 5  # pro_limit=5 в фикстуре settings
+        await db.commit()
+
+    await dp.feed_update(bot, _text_update("Вопрос при исчерпанном лимите", update_id=11, user_id=779))
+
+    joined = "\n".join(session.sent_texts())
+    assert "Лимит сообщений" in joined
+    assert "Перейти на PRO" not in joined
+
+
+async def test_free_user_at_limit_gets_pro_upsell(engine, settings):
+    """Free-юзер при исчерпании: upsell-кнопка «Перейти на PRO» на месте."""
+    dp, bot, session = await _make_dispatcher(engine, settings)
+
+    await dp.feed_update(bot, _text_update("раз", update_id=20, user_id=780))
+    await dp.feed_update(bot, _text_update("два", update_id=21, user_id=780))
+    await dp.feed_update(bot, _text_update("три — лимит", update_id=22, user_id=780))
+
+    joined = "\n".join(session.sent_texts())
+    assert "Лимит сообщений" in joined
+    markup = session.last_reply_markup()
+    assert markup is not None
+    buttons = [b.text for row in markup.inline_keyboard for b in row]
+    assert any("PRO" in text for text in buttons)
+
+
 async def test_help_and_privacy_commands(engine, settings):
     dp, bot, session = await _make_dispatcher(engine, settings)
     await dp.feed_update(bot, _text_update("/help", update_id=1))

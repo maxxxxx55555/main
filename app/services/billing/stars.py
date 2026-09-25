@@ -15,6 +15,8 @@ from app.services.billing.plans import Plan, PlanCatalog
 
 PAYLOAD_PREFIX = "buy"
 
+MAX_PAYLOAD_LEN = 128  # защита от гигантских payload в pre_checkout
+
 logger = logging.getLogger(__name__)
 
 
@@ -36,6 +38,8 @@ class StarsBillingService:
     # --- 5.2.2 pre_checkout: только лёгкая валидация, без БД ---
     def validate_payload(self, payload: str, amount_stars: int) -> InvoiceIntent | None:
         """Источник истины по цене — каталог, а не payload."""
+        if not payload or len(payload) > MAX_PAYLOAD_LEN:
+            return None
         parts = payload.split(":")
         if len(parts) != 3 or parts[0] != PAYLOAD_PREFIX:
             return None

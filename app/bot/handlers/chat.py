@@ -55,7 +55,9 @@ async def handle_chat(
     except LimitExceeded as exc:
         await message.answer(
             texts.limit_reached(exc.reset_at.strftime("%d.%m.%Y")),
-            reply_markup=upsell_kb(),
+            # Upsell «Перейти на PRO» — только для free (см. п.5 ниже):
+            # платным при исчерпании показываем /buy без PRO-CTA.
+            reply_markup=upsell_kb() if user.plan == "free" else None,
         )
         return
 

@@ -92,6 +92,9 @@ async def admin_broadcast(
         return
 
     tg_ids = list((await session.execute(select(User.tg_id))).scalars().all())
+    if not tg_ids:
+        await message.answer("📣 Нечего рассылать: пользователей пока нет.")
+        return
     await message.answer(f"📣 Рассылаю {len(tg_ids)} пользователям…")
     sent = failed = 0
     for tg_id in tg_ids:
