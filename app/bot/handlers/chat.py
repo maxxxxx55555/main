@@ -105,7 +105,10 @@ async def handle_chat(
     await repo.add_message(user.id, "assistant", content, reply.tokens)
     limit = catalog.limit_for(user.plan)
     suffix = usage.warning_suffix(remaining, limit, user.period_reset_at)
-    markup = upsell_kb() if suffix else None
+    # Upsell только free-пользователям: платным при лимите показываем /buy без PRO-CTA.
+    markup = None
+    if suffix:
+        markup = upsell_kb() if user.plan == "free" else None
     await send_llm(message, content + suffix, reply_markup=markup)
 
 

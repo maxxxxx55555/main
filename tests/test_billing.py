@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from app.db.repo.knowledge import KnowledgeRepo
+from app.db.repo.messages import MessageRepo
+from app.db.repo.payments import PaymentRepo
 from app.db.repo.users import UserRepo
 from app.services.billing.plans import PlanCatalog
 from app.services.billing.stars import StarsBillingService
@@ -99,3 +102,33 @@ async def test_refund_downgrades(session, settings):
 
     # Повторный refund по тому же charge_id невозможен
     assert await billing.refund(session, user, "c-4") is False
+
+
+async def test_activate_rejects_wrong_amount(session, settings):
+    """Сумма в платеже обязана совпадать с каталогом: занижение блокируем до записи."""
+    billing = StarsBillingService(PlanCatalog(settings), settings)
+    user = await UserRepo(session).get_or_create(5)
+
+    assert await billing.activate(session, user, "pro", 1, "c-wrong-1") is None
+    assert user.plan == "free"
+    assert await PaymentRepo(session).get_by_charge_id("c-wrong-1") is None
+
+
+async def test_forget_me_deletes_paying_user(session, settings):
+    """GDPR-удаление платящего юзера не упирается в payments RESTRICT.
+
+    Регрессия UX-аудита: /forget_me обещает «удаляет всё сразу», поэтому
+    удаление платежей идёт до удаления профиля (иначе IntegrityError на PG).
+    """
+    billing = StarsBillingService(PlanCatalog(settings), settings)
+    user = await UserRepo(session).get_or_create(6)
+    assert await billing.activate(session, user, "pro", 100, "c-forget-1") is not None
+
+    await PaymentRepo(session).delete_for_user(user.id)
+    await MessageRepo(session).delete_history(user.id)
+    await KnowledgeRepo(session).delete_for_owner(user.id)
+    await session.delete(user)
+    await session.flush()
+
+    assert await UserRepo(session).get_by_tg_id(6) is None
+    assert await PaymentRepo(session).get_by_charge_id("c-forget-1") is None

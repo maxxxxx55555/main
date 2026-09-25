@@ -8,6 +8,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -94,16 +95,31 @@ class Settings(BaseSettings):
     webhook_secret_path: str = "tg-webhook"  # путь: {webhook_base_url}/{webhook_secret_path}
     webhook_secret_token: str = ""  # X-Telegram-Bot-Api-Secret-Token; пусто → сгенерировать
     webapp_host: str = "0.0.0.0"
-    webapp_port: int = 8080  # веб-сервер: webhook + /health
+    # WEBAPP_PORT задаёт порт явно; PORT читается для PaaS (Render/Railway)
+    webapp_port: int = Field(
+        default=8080, validation_alias=AliasChoices("WEBAPP_PORT", "PORT")
+    )
 
     # --- Misc ---
     log_level: str = "INFO"
 
     @property
     def admin_id_set(self) -> set[int]:
+        """ADMIN_IDS терпим к формату: «1,2 3;4», пробелы, мусор — пропускаем с варнингом."""
         if not self.admin_ids.strip():
             return set()
-        return {int(x) for x in self.admin_ids.replace(" ", "").split(",") if x}
+        import logging
+
+        ids: set[int] = set()
+        for token in self.admin_ids.replace(";", ",").replace(" ", ",").split(","):
+            token = token.strip()
+            if not token:
+                continue
+            try:
+                ids.add(int(token))
+            except ValueError:
+                logging.getLogger(__name__).warning("ADMIN_IDS: пропущен мусор %r", token)
+        return ids
 
     @property
     def use_mock_llm(self) -> bool:

@@ -32,8 +32,8 @@ fi
 echo "=== 5/6 Сборка и старт (prod-профиль: PostgreSQL + Redis) ==="
 docker compose --profile prod up -d --build
 
-echo "=== 6/6 Миграции и статус ==="
-docker compose --profile prod exec -T app alembic upgrade head
+echo "=== 6/6 Статус (миграции применяются приложением автоматически) ==="
+docker compose --profile prod exec -T app alembic current
 docker compose --profile prod ps
 curl -fsS http://localhost:8080/health && echo " <- /health OK"
 

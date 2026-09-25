@@ -16,13 +16,11 @@ class PaymentRepo(BaseRepo[Payment]):
 
         True — платёж записан (первичная доставка successful_payment).
         False — дубликат по telegram_payment_charge_id (повтор не активирует план).
-        """
-        exists = await self.session.scalar(
-            select(Payment.id).where(Payment.telegram_payment_charge_id == charge_id)
-        )
-        if exists is not None:
-            return False
 
+        Реализация — ON CONFLICT DO NOTHING: гонка двух параллельных доставок
+        одного charge_id атомарно разрешается на уровне БД, а не check-then-insert
+        (SELECT перед INSERT пропускал бы дубли under concurrency).
+        """
         values = {
             "user_id": user_id,
             "plan": plan,
@@ -39,9 +37,10 @@ class PaymentRepo(BaseRepo[Payment]):
             stmt = sqlite_insert(Payment).values(**values).on_conflict_do_nothing(
                 index_elements=["telegram_payment_charge_id"]
             )
-        await self.session.execute(stmt)
+        result = await self.session.execute(stmt)
         await self.session.flush()
-        return True
+        # rowcount==1 — вставка прошла; 0 — конфликт по UNIQUE (дубликат доставки).
+        return (result.rowcount or 0) == 1
 
     async def mark_refunded(self, charge_id: str) -> Payment | None:
         payment = await self.session.scalar(
@@ -52,6 +51,14 @@ class PaymentRepo(BaseRepo[Payment]):
         payment.status = "refunded"
         await self.session.flush()
         return payment
+
+    async def delete_for_user(self, user_id: int) -> int:
+        from sqlalchemy import delete
+
+        result = await self.session.execute(
+            delete(Payment).where(Payment.user_id == user_id)
+        )
+        return result.rowcount or 0
 
     async def get_by_charge_id(self, charge_id: str) -> Payment | None:
         return await self.session.scalar(

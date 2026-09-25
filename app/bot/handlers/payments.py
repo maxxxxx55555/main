@@ -138,8 +138,15 @@ async def on_successful_payment(
         payment.telegram_payment_charge_id,
     )
     if plan is None:
-        # Дубликат доставки — план уже активирован ранее (идемпотентность §5.3)
-        await message.answer("Этот платёж уже был активирован ранее ✅")
+        # Дубликат доставки (уже активирован) или расхождение суммы с каталогом:
+        # платёж есть в Telegram, но активировать его нельзя — отправляем в поддержку.
+        logger.error(
+            "Payment not activated: plan=%s amount=%s charge=%s",
+            intent.plan.id,
+            payment.total_amount,
+            payment.telegram_payment_charge_id,
+        )
+        await message.answer(PAYMENT_MISMATCH)
         return
 
     await session.refresh(user)

@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 from typing import Any, Protocol
 
 from app.config import Settings
@@ -68,7 +69,12 @@ class ChromaVectorStore:
     async def add(self, owner_id: int, chunks: list[str]) -> int:
         if not chunks:
             return 0
-        ids = [f"{owner_id}-{i}-{abs(hash(c))}" for i, c in enumerate(chunks)]
+        # Стабильные ID: sha256 контента вместо builtin hash() (у него случайный
+        # seed на процесс — дубли при перезагрузке докинули бы чанки заново).
+        ids = [
+            f"{owner_id}-{i}-{hashlib.sha256(c.encode()).hexdigest()[:16]}"
+            for i, c in enumerate(chunks)
+        ]
 
         def _add() -> None:
             self._col.add(documents=chunks, ids=ids, metadatas=[{"owner_id": owner_id}] * len(chunks))

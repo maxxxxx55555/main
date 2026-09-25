@@ -1,8 +1,18 @@
 # ✅ CHECKLIST — перед запуском на пользователей
 
+## Проверки текущего состояния (25.09.2026)
+
+- [x] `.venv\Scripts\python.exe -m pytest -q` → **88 passed**
+- [x] `.venv\Scripts\python.exe -m ruff check app migrations tests` → **All checks passed**
+- [x] `.venv\Scripts\python.exe -m compileall -q app migrations tests` → без ошибок компиляции
+- [x] Alembic на отдельной SQLite-БД: `upgrade head → downgrade base → upgrade head` → все три команды завершились с кодом 0
+- [x] Миграции применяются автоматически при старте (`app.db.base.run_migrations`), повторный запуск безопасен
+- [x] Локальный `HEAD` и `origin/main` синхронизируются после финального коммита
+- [x] В tracked-файлах нет `.env`, рабочей БД, Chroma-данных или `.venv`
+
 ## Локально (5 минут)
 
-- [ ] `pytest -q` → **34 passed**
+- [ ] `pytest -q` → **88 passed**
 - [ ] `.venv/Scripts/python -m app.main` стартует, в логе нет traceback
 - [ ] `curl http://localhost:8080/health` → `{"status": "ok"}`
 - [ ] В Telegram: `/start` → приветствие с меню

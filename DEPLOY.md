@@ -54,7 +54,14 @@ LLM_API_KEY=ключ_GLM_или_OpenAI
 LLM_BASE_URL=https://open.bigmodel.cn/api/paas/v4   # или OpenAI
 ADMIN_IDS=ваш_telegram_id
 POSTGRES_PASSWORD=длинная_случайная_строка          # openssl rand -hex 16
+# --- обязательно для prod-профиля (иначе приложение пишет в локальный SQLite) ---
+DATABASE_URL=postgresql+asyncpg://bot:ВАШ_POSTGRES_PASSWORD@postgres:5432/aiemployee
+REDIS_URL=redis://redis:6379/0
 ```
+
+> ⚠️ Если оставить `DATABASE_URL` из `.env.example` (SQLite), контейнер `postgres`
+> запустится, но бот будет писать в файл внутри контейнера — а cron-бэкап §6
+> будет архивировать пустую PostgreSQL. Проверьте значение перед запуском.
 
 **Режим приёма апдейтов:**
 
@@ -71,10 +78,15 @@ POSTGRES_PASSWORD=длинная_случайная_строка          # open
 
 ```bash
 docker compose --profile prod up -d --build
-docker compose --profile prod exec -T app alembic upgrade head   # миграции
+docker compose --profile prod ps                                # оба сервиса healthy
+docker compose --profile prod exec -T app alembic current       # опционально: миграции уже применены
 curl http://localhost:8080/health                                # {"status": "ok"}
 docker compose logs -f app                                       # смотреть логи
 ```
+
+> 🗄 Миграции Alembic применяются **автоматически при старте** приложения
+> (`run_migrations()` в `app.main`), поэтому отдельный шаг не обязателен.
+> Ручной `alembic upgrade head` безопасен: на актуальной схеме это no-op.
 
 Готово — бот онлайн 24/7. Проверка: напишите боту `/start` в Telegram.
 

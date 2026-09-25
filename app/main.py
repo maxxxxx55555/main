@@ -30,7 +30,7 @@ from app.bot.middlewares.throttling import ThrottlingMiddleware
 from app.bot.middlewares.user import UserMiddleware
 from app.bot.router import build_router
 from app.config import get_settings
-from app.db.base import build_engine, build_sessionmaker, create_all
+from app.db.base import build_engine, build_sessionmaker, run_migrations
 from app.services.ai.provider import build_provider
 from app.services.ai.rag import RagService
 from app.services.billing.plans import PlanCatalog
@@ -140,9 +140,10 @@ async def run() -> None:
             mask_secret(settings.llm_api_key),
         )
 
-    # DDL: dev — create_all (просто); prod — alembic upgrade head (см. DEPLOY.md)
+    # Схема: сначала создаём каталог под SQLite (build_engine), затем мигрируем.
+    # Alembic — единый источник истины для dev и prod.
     engine = build_engine()
-    await create_all(engine)
+    await asyncio.to_thread(run_migrations)
 
     dp, bot = _build_dispatcher(settings, engine)
     sessionmaker = build_sessionmaker(engine)

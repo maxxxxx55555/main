@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +14,8 @@ from app.db.repo.users import UserRepo
 from app.services.billing.plans import Plan, PlanCatalog
 
 PAYLOAD_PREFIX = "buy"
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -67,6 +70,16 @@ class StarsBillingService:
         """
         plan = self.catalog.get(plan_id)
         if plan is None or plan.price_stars <= 0:
+            return None
+        # Сумма из Telegram обязана совпадать с каталогом: источник цены — сервер,
+        # а не payload. Без этого заниженный amount записал бы paid-строку за копейки.
+        if amount_stars != plan.price_stars:
+            logger.error(
+                "Payment amount mismatch: plan=%s expected=%s got=%s",
+                plan.id,
+                plan.price_stars,
+                amount_stars,
+            )
             return None
 
         recorded = await PaymentRepo(session).create_paid_idempotent(

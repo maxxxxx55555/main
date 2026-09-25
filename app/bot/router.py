@@ -10,23 +10,27 @@ from aiogram import Router
 
 
 def _clone_router(source: Router, name: str) -> Router:
-    """Клонирует хэндлеры модульного роутера в независимый экземпляр.
+    """Создаёт независимую копию роутера только через публичный API aiogram.
 
-    Aiogram разрешает подключить один Router только к одному родителю. В тестах,
-    при hot-reload и повторной сборке dispatcher один и тот же модульный роутер
-    может понадобиться несколько раз, поэтому создаём новый Router и переносим
-    в него зарегистрированные HandlerObject без изменения бизнес-логики.
+    Aiogram запрещает подключать один Router к двум родителям, поэтому при
+    повторной сборке dispatcher (тесты, hot-reload) регистрации переносятся в
+    новый Router: для каждого хэндлера заново вызывается observer.register()
+    с исходными фильтрами. Приватные поля (`_handler`, `_parent_router`) не
+    используются.
     """
     target = Router(name=name)
     for event_name, source_observer in source.observers.items():
         target_observer = target.observers[event_name]
-        target_observer.handlers.extend(source_observer.handlers)
-        if source_observer._handler.filters:
-            target_observer._handler.filters.extend(source_observer._handler.filters)
         for middleware in source_observer.middleware:
             target_observer.middleware(middleware)
         for middleware in source_observer.outer_middleware:
             target_observer.outer_middleware(middleware)
+        for handler in source_observer.handlers:
+            filters = [
+                filter_object.magic if filter_object.magic is not None else filter_object.callback
+                for filter_object in (handler.filters or [])
+            ]
+            target_observer.register(handler.callback, *filters, flags=dict(handler.flags))
     return target
 
 

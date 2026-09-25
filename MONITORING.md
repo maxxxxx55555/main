@@ -9,7 +9,7 @@
 **Через /health (если есть доступ к серверу):**
 ```bash
 curl http://localhost:8080/health
-# {"status": "ok", "mode": "polling"}  ← норма
+# {"status":"ok","mode":"polling","version":"1.1.0","uptime_s":123}  ← норма
 ```
 
 **Через Telegram (без сервера):**
@@ -45,6 +45,8 @@ docker compose logs -f app --tail 50   # «Бот запущен (long polling)�
 С оплатой: 9
 Сообщений всего: 3811
 Выручка (Stars): 900 ⭐️
+Возвраты: 0 ⭐️
+Тарифы: free: 133 · pro: 7 · business: 2
 ```
 
 - **Выручка (Stars)** — сумма всех успешных платежей. 1 ⭐️ ≈ $0.013 при выводе

@@ -23,6 +23,7 @@ from app.bot.keyboards.reply import BUTTON_LABELS
 from app.bot.states import KnowledgeStates
 from app.config import Settings
 from app.db.models.user import User
+from app.db.repo.knowledge import KnowledgeRepo
 from app.services.ai.rag import RagService
 
 router = Router(name="knowledge")
@@ -41,23 +42,41 @@ def _is_knowledge_file(message: Message) -> bool:
     return document.mime_type == "text/plain" or filename.endswith(_ALLOWED_EXTENSIONS)
 
 
-async def show_knowledge(target: Message, user: User, settings: Settings) -> None:
+async def show_knowledge(
+    target: Message, user: User, settings: Settings, chunks: int = 0
+) -> None:
     """Экран базы знаний — общий для команды, кнопок и callback."""
+    text = texts.knowledge_intro(
+        user.plan != "free", settings.max_message_len, MAX_DOCUMENT_BYTES // 1024
+    )
+    if user.plan != "free":
+        text += f"\n\nЗагружено фрагментов: <b>{chunks}</b>"
     await send_authored(
         target,
-        texts.knowledge_intro(user.plan != "free", settings.max_message_len),
+        text,
         reply_markup=knowledge_kb(user.plan != "free"),
     )
 
 
 @router.message(Command("knowledge"))
-async def cmd_knowledge(message: Message, user: User, settings: Settings) -> None:
-    await show_knowledge(message, user, settings)
+async def cmd_knowledge(
+    message: Message, user: User, session: AsyncSession, settings: Settings
+) -> None:
+    chunks = await KnowledgeRepo(session).count_for_owner(user.id)
+    await show_knowledge(message, user, settings, chunks)
 
 
 @router.callback_query(F.data == "knowledge")
-async def cb_knowledge(callback: CallbackQuery, user: User, settings: Settings) -> None:
-    text = texts.knowledge_intro(user.plan != "free", settings.max_message_len)
+async def cb_knowledge(
+    callback: CallbackQuery, user: User, session: AsyncSession, settings: Settings
+) -> None:
+    text = texts.knowledge_intro(
+        user.plan != "free", settings.max_message_len, MAX_DOCUMENT_BYTES // 1024
+    )
+    if user.plan != "free":
+        chunks = await KnowledgeRepo(session).count_for_owner(user.id)
+        text += f"\n\nЗагружено фрагментов: <b>{chunks}</b>"
+    await safe_edit(callback.message, text, reply_markup=knowledge_kb(user.plan != "free"))
     await safe_edit(callback.message, text, reply_markup=knowledge_kb(user.plan != "free"))
     await callback.answer()
 
@@ -102,10 +121,10 @@ async def save_knowledge(
         return
 
     added = await rag.add_text(session, user.id, text)
-    await state.clear()
     if added == 0:
         await message.answer("🤷 Не нашёл в сообщении текста для базы знаний. Попробуйте ещё раз или /cancel")
         return
+    await state.clear()
     await message.answer(texts.knowledge_saved(added))
 
 
@@ -132,7 +151,12 @@ async def save_knowledge_file(
         return
 
     buffer = BytesIO()
-    await message.bot.download(document, destination=buffer)
+    try:
+        await message.bot.download(document, destination=buffer)
+    except Exception:  # noqa: BLE001 — сеть/Telegram: не роняем апдейт
+        logger.warning("Не удалось скачать документ user_id=%s", user.id)
+        await message.answer("❌ Не удалось скачать файл, попробуйте ещё раз.")
+        return
     content = buffer.getvalue().decode("utf-8", errors="replace").strip()
     if not content:
         await message.answer("🤷 Файл пустой — нечего добавить в базу знаний.")

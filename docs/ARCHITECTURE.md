@@ -7,7 +7,8 @@
 | Язык / фреймворк | Python 3.11+, aiogram 3.x |
 | ORM / БД | SQLAlchemy 2 (async) · SQLite (dev) / PostgreSQL 16 + pgvector (prod) |
 | Кэш / состояние | Redis (опционально; без Redis — in-memory режим) |
-| LLM | OpenAI-совместимый API: GLM (Zhipu), OpenAI, совместимые прокси; mock-режим без ключа |
+| LLM | OpenAI-совместимый API: пресеты Groq / OpenRouter / OpenAI / GLM; mock-режим без ключа |
+| RAG | SQLite + BM25-lite (по умолчанию) или локальный ChromaDB (`VECTOR_STORE=chroma`) |
 | Платежи | Telegram Stars (XTR) |
 | Деплой | Docker + docker-compose; long polling (dev) / webhook (prod) |
 
@@ -70,7 +71,8 @@
 │ LLM API               │  │ База данных        │  │ Redis (опц.)       │
 │ (OpenAI-совместимый)  │  │ dev:  SQLite       │  │ · FSM storage      │
 │ · chat/completions    │  │ prod: PostgreSQL16 │  │ · rate-limit       │
-│ · embeddings (RAG)    │  │        + pgvector  │  │ · кэш              │
+│ · RAG (BM25/Chroma)   │  │     SQLite /       │  │ · FSM-состояние    │
+│ · embeddings (опц.)   │  │     PostgreSQL     │  │ · throttle         │
 │ GLM / OpenAI / mock   │  └────────────────────┘  └────────────────────┘
 └───────────────────────┘
 ```
@@ -79,7 +81,7 @@
 
 - **Тонкие хэндлеры.** `bot/handlers` ничего не знает о БД и LLM: парсят апдейты, вызывают сервисы, формируют ответы. Бизнес-логика — в `services`, доступ к данным — только через `db/repo`.
 - **Сменяемость LLM.** Единый интерфейс провайдера; конкретный бэкенд выбирается конфигом (`base_url` + `model`) — GLM, OpenAI или любой OpenAI-совместимый прокси. Без ключа автоматически включается `MockProvider`.
-- **Портабельность БД.** Один код для SQLite и PostgreSQL; pgvector-специфика изолирована в модели `knowledge_base` и RAG-сервисе.
+- **Портабельность БД.** Один код для SQLite и PostgreSQL; специфика поиска RAG изолирована в `services/ai/vector_store.py`, интерфейс `RagService` одинаков для обоих вариантов.
 - **Redis опционален.** Нет Redis → FSM в `MemoryStorage`, rate-limit в памяти. Есть → `RedisStorage`, распределённый throttle. API сервисов не меняется.
 - **Два режима приёма апдейтов.** Long polling для dev (без публичного URL), webhook для prod и горизонтального масштабирования (§10).
 
@@ -97,33 +99,41 @@ bot/                                # корень репозитория
 │   │   │   ├── user.py             #   User: tg_id, plan, messages_used, period_reset_at, tz
 │   │   │   ├── message.py          #   Message: role, content, tokens
 │   │   │   ├── payment.py          #   Payment: Stars-платёж, telegram_payment_charge_id
-│   │   │   └── knowledge.py        #   KnowledgeBase: content, embedding (pgvector / BLOB)
+│   │   │   └── knowledge.py        #   KnowledgeBase: content, tokens (поиск — лексический/Chroma)
 │   │   └── repo/                   # репозитории (DAO): единственная точка доступа к БД
 │   │       ├── base.py             #   generic-CRUD (get, add, update, delete)
 │   │       ├── users.py            #   get_or_create по tg_id, апдейты плана/usage
 │   │       ├── messages.py         #   история, окно контекста, статистика
 │   │       ├── payments.py         #   идемпотентная запись платежей
-│   │       └── knowledge.py        #   вставка чанков, ANN-поиск
+│   │       └── knowledge.py        #   вставка чанков, поиск (BM25-lite / Chroma)
 │   ├── services/
 │   │   ├── ai/
 │   │   │   ├── provider.py         # AIProvider: OpenAICompatProvider | MockProvider
 │   │   │   ├── prompt.py           # системный промпт «AI-Сотрудника» (шаблон + правила)
-│   │   │   ├── context.py          # сборка контекста: summary + последние N, бюджет токенов
-│   │   │   └── rag.py              # RAG v2: chunking, embeddings, retrieval
+│   │   │   ├── context.py          # сборка контекста: последние N сообщений + бюджет токенов
+│   │   │   ├── scoring.py          # BM25-lite для встроенного лексического RAG
+│   │   │   ├── vector_store.py     # SQLite-хранилище | ChromaDB (локально)
+│   │   │   └── rag.py              # RAG: chunking, ingestion, retrieval
 │   │   ├── billing/
 │   │   │   ├── plans.py            # каталог тарифов: id, лимит, цена в XTR
 │   │   │   └── stars.py            # invoice, pre_checkout-валидация, активация, refund
-│   │   └── limits/
-│   │       └── usage.py            # проверка лимита, атомарное списание, сброс периода
+│   │   ├── limits/
+│   │   │   └── usage.py            # проверка лимита, атомарное списание, сброс периода
+│   │   └── maintenance.py          # retention-очистка истории сообщений
 │   ├── bot/
-│   │   ├── router.py               # агрегация всех Router'ов в порядке приоритета
+│   │   ├── router.py               # агрегация Router'ов в порядке приоритета (публичный API)
+│   │   ├── commands.py             # setMyCommands: меню команд Telegram
+│   │   ├── errors.py               # глобальный error-handler + анти-спам уведомлений
+│   │   ├── helpers.py              # безопасная отправка/редактирование сообщений
+│   │   ├── texts.py                # все пользовательские тексты (HTML-safe)
 │   │   ├── states.py               # FSM-состояния
 │   │   ├── handlers/
-│   │   │   ├── start.py            # /start, /help, онбординг
+│   │   │   ├── start.py            # /start, /help, /stats, /forget_me
 │   │   │   ├── chat.py             # основной диалог с LLM
 │   │   │   ├── payments.py         # /buy, pre_checkout_query, successful_payment
-│   │   │   ├── knowledge.py        # добавление знаний, /forget_me
-│   │   │   └── admin.py            # /stats, /refund — только для ADMIN_IDS
+│   │   │   ├── knowledge.py        # /knowledge: текст и .txt/.md
+│   │   │   ├── menu.py             # /cancel, /privacy, reply-кнопки, unknown-команды
+│   │   │   └── admin.py            # /adminstats, /broadcast, /refund (ADMIN_IDS)
 │   │   ├── keyboards/
 │   │   │   ├── inline.py           # меню, выбор тарифа, кнопка «Оплатить»
 │   │   │   └── reply.py            # быстрые reply-кнопки
@@ -150,7 +160,7 @@ bot/                                # корень репозитория
 
 ## 3. Database schema
 
-DDL в диалекте PostgreSQL (prod). В dev SQLite: `BIGINT GENERATED ALWAYS AS IDENTITY` → `INTEGER PRIMARY KEY AUTOINCREMENT`, `TIMESTAMPTZ` → `TIMESTAMP`, `vector` → `BLOB` (см. примечания ниже). Миграции — alembic, общие для обоих профилей.
+DDL в диалекте PostgreSQL (prod). В dev SQLite: `BIGINT GENERATED ALWAYS AS IDENTITY` → `INTEGER PRIMARY KEY AUTOINCREMENT`, `TIMESTAMPTZ` → `TIMESTAMP`. Миграции — alembic, общие для обоих профилей и применяются при старте (§2, §10).
 
 ### users
 
@@ -181,7 +191,7 @@ CREATE TABLE messages (
 CREATE INDEX ix_messages_user_created ON messages (user_id, created_at DESC);
 ```
 
-Назначение: история диалога (контекст LLM), построение summary, retention-очистка, статистика.
+Назначение: история диалога (контекст LLM), retention-очистка, статистика.
 
 ### payments
 
@@ -203,26 +213,27 @@ CREATE INDEX ix_payments_user ON payments (user_id, created_at DESC);
 ### knowledge_base
 
 ```sql
-CREATE EXTENSION IF NOT EXISTS vector;
-
 CREATE TABLE knowledge_base (
-    id        BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    owner_id  BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    content   TEXT         NOT NULL,                 -- один чанк текста
-    embedding vector(1024) NOT NULL                  -- размерность = EMBEDDING_DIM
+    id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    owner_id   BIGINT      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    content    TEXT        NOT NULL,   -- один чанк текста
+    tokens     INTEGER     NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
--- ANN-индекс для retrieval (pgvector >= 0.5)
-CREATE INDEX ix_kb_embedding_hnsw ON knowledge_base
-    USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
 
 CREATE INDEX ix_kb_owner ON knowledge_base (owner_id);
 ```
 
+Поиск по чанкам (`services/ai/vector_store.py`):
+
+- **sqlite (по умолчанию, $0)** — лексический BM25-lite по чанкам владельца
+  (`services/ai/scoring.py`): без внешних сервисов и без колонки эмбеддингов;
+- **chroma (`VECTOR_STORE=chroma`)** — локальный ChromaDB в `./chroma_db`
+  со встроенной ONNX-моделью; работает даже с Groq/OpenRouter (у них нет embeddings API);
+- при росте нагрузок — PostgreSQL + pgvector с HNSW-индексом (этап 2, §10).
+
 **Примечания**
 
-- **SQLite (dev).** `embedding` — колонка `BLOB` (float32 little-endian); ANN-поиск заменяется линейным перебором с косинусной близостью в Python — на dev-объёмах приемлемо. Тип колонки выбирается `TypeDecorator`'ом, код сервисов одинаков.
-- Размерность `vector(N)` обязана совпадать с фактической выдачей `EMBEDDING_MODEL` (`EMBEDDING_DIM`); при смене модели — миграция + переиндексация базы знаний.
 - `messages` растёт быстрее остальных таблиц: retention-политика (§9.4), далее партиционирование (§10).
 - `payments.telegram_payment_charge_id` (`UNIQUE`) — техническая основа идемпотентности платежей (§5).
 
@@ -369,31 +380,26 @@ class AIProvider(Protocol):
 
 Сборка в `services/ai/context.py` перед каждым ответом:
 
-1. **system** — промпт + (опционально) summary предыдущего диалога + (опционально) блок RAG «База знаний».
-2. **history** — последние `CONTEXT_MAX_MESSAGES` (по умолчанию 20) сообщений из `messages` (`user_id`, `created_at DESC`).
-3. **Бюджет токенов** `CONTEXT_TOKEN_BUDGET` (~3000): хвост диалога включается, пока сумма `tokens` (сохранённых в `messages.tokens` из API-usage) не исчерпает бюджет.
-4. **Summary.** Когда старая часть диалога перестаёт помещаться в бюджет, она сворачивается отдельным LLM-вызовом в краткое резюме (2–5 предложений), хранится у пользователя и подставляется в `system`. Так длинный диалог не теряет ранний контекст и не растёт в стоимости линейно.
+1. **system** — промпт «AI-Сотрудника» + (опционально) блок RAG «База знаний».
+2. **history** — последние `CONTEXT_WINDOW` (по умолчанию 20) сообщений из `messages` (`user_id`, `created_at DESC`), в хронологическом порядке.
+3. **Бюджет токенов** `CONTEXT_TOKEN_BUDGET` (~3000): сообщения добавляются с конца, пока суммарная оценка не исчерпает бюджет.
+4. **Расширение (roadmap v1.2):** сворачивание старой части диалога в summary — когда бюджет начинает вытеснять ранний контекст.
 
-### 6.4 RAG (v2, pgvector)
+### 6.4 RAG (лексический по умолчанию, Chroma опционально)
 
 **Ingestion** (`services/ai/rag.py`):
 
-- Текст базы знаний режется на чанки `RAG_CHUNK_SIZE` (1000 символов) с перекрытием `RAG_CHUNK_OVERLAP` (150) — по границам абзацев, где возможно.
-- Чанки → `embeddings.create(EMBEDDING_MODEL)` → строки в `knowledge_base` (`vector(EMBEDDING_DIM)`).
+- Текст базы знаний режется на чанки `RAG_CHUNK_SIZE` (1000 символов) с перекрытием
+  `RAG_CHUNK_OVERLAP` (150) — по границам абзацев/предложений, где возможно.
+- Чанки сохраняются в `knowledge_base` (SQLite-хранилище) либо в локальную
+  коллекцию ChromaDB (`VECTOR_STORE=chroma`, `CHROMA_DIR=./chroma_db`).
 
 **Retrieval** (в промпт добавляется только на платных тарифах):
 
-```sql
-SELECT   content,
-         embedding <=> :query_vec AS distance
-FROM     knowledge_base
-WHERE    owner_id = :owner_id
-ORDER BY embedding <=> :query_vec
-LIMIT    :rag_top_k;
-```
-
-- Фильтр релевантности по порогу косинусной близости; отобранные чанки вставляются в `system` в блоке «База знаний» (с указанием источника).
-- **SQLite (dev)**: эмбеддинги — `BLOB`, поиск линейный в Python (объёмы малы); интерфейс RAG не меняется.
+- `sqlite`: BM25-lite по чанкам владельца (`services/ai/scoring.py`) — учитывает
+  IDF и длину документа, нормализует русские окончания; ноль внешних вызовов.
+- `chroma`: семантический топ-K по локальной embedding-модели; данные не покидают сервер.
+- Отобранные чанки вставляются в `system` в блоке «База знаний».
 
 ## 7. Конфигурация
 
@@ -402,24 +408,24 @@ LIMIT    :rag_top_k;
 | Переменная | Обяз. | По умолчанию | Описание |
 |---|---|---|---|
 | `BOT_TOKEN` | ✅ | — | Токен бота из @BotFather |
-| `USE_WEBHOOK` | — | `false` | `false` — long polling (dev); `true` — webhook (prod) |
+| `WEBHOOK_MODE` | — | `false` | `false` — long polling (dev); `true` — webhook (prod) |
 | `WEBHOOK_BASE_URL` | webhook | — | Публичный HTTPS-URL (`https://bot.example.com`) |
-| `WEBHOOK_SECRET_PATH` | — | случайная строка | Секретный суффикс пути приёма апдейтов |
+| `WEBHOOK_SECRET_PATH` | — | `tg-webhook` | Секретный суффикс пути приёма апдейтов |
 | `WEBHOOK_SECRET_TOKEN` | webhook | — | `secret_token` для проверки заголовка Telegram (§9.3) |
-| `WEBHOOK_PORT` | — | `8080` | Порт aiohttp-сервера (за reverse-proxy/TLS) |
-| `DATABASE_URL` | — | `sqlite+aiosqlite:///./bot.db` | Dev — SQLite; prod — `postgresql+asyncpg://user:pass@db:5432/bot` |
+| `WEBAPP_PORT` | — | `8080` | Порт aiohttp-сервера (webhook + `/health`); читается и `PORT` (Render/Railway) |
+| `DATABASE_URL` | — | `sqlite+aiosqlite:///<project>/data/bot.db` | Dev/Free — SQLite; prod — `postgresql+asyncpg://bot:***@postgres:5432/aiemployee` |
 | `REDIS_URL` | — | *(пусто)* | Пусто → in-memory (FSM, throttle); иначе `redis://redis:6379/0` |
+| `LLM_PROVIDER` | — | `groq` | Пресет `groq` / `openrouter` / `openai` / `glm` |
 | `LLM_API_KEY` | — | *(пусто)* | Пусто → **mock-режим** без внешних вызовов |
 | `LLM_MOCK` | — | `0` | `1` — принудительный MockProvider (тесты) |
-| `LLM_BASE_URL` | — | `https://open.bigmodel.cn/api/paas/v4` | OpenAI-совместимый эндпоинт (GLM / OpenAI / прокси) |
-| `LLM_MODEL` | — | `glm-4.5` | Модель для `chat.completions` |
-| `LLM_TEMPERATURE` | — | `0.7` | Температура генерации |
-| `LLM_TIMEOUT` | — | `90` | Таймаут запроса, сек |
+| `LLM_BASE_URL` / `LLM_MODEL` | — | *(пусто → пресет)* | Переопределение эндпоинта/модели провайдера |
+| `LLM_TIMEOUT` | — | `60` | Таймаут запроса, сек |
 | `LLM_MAX_RETRIES` | — | `3` | Попыток на запрос (§8.1) |
 | `LLM_FALLBACK_BASE_URL` / `LLM_FALLBACK_MODEL` | — | *(пусто)* | Fallback-провайдер (§8.2) |
-| `EMBEDDING_MODEL` | — | `embedding-3` | Модель эмбеддингов (RAG) |
-| `EMBEDDING_DIM` | — | `1024` | Размерность; обязана совпадать с моделью и `vector(N)` |
-| `CONTEXT_MAX_MESSAGES` | — | `20` | Последних сообщений в контексте |
+| `VECTOR_STORE` | — | `sqlite` | `sqlite` — BM25-lite; `chroma` — локальный ChromaDB |
+| `CHROMA_DIR` | — | `./chroma_db` | Каталог данных ChromaDB (при `VECTOR_STORE=chroma`) |
+| `RAG_CHUNK_SIZE` / `RAG_CHUNK_OVERLAP` / `RAG_TOP_K` | — | `1000` / `150` / `5` | Параметры RAG (§6.4) |
+| `CONTEXT_WINDOW` | — | `20` | Последних сообщений в контексте |
 | `CONTEXT_TOKEN_BUDGET` | — | `3000` | Бюджет токенов контекста |
 | `RAG_CHUNK_SIZE` / `RAG_CHUNK_OVERLAP` / `RAG_TOP_K` | — | `1000` / `150` / `5` | Параметры RAG (§6.4) |
 | `FREE_LIMIT` / `PRO_LIMIT` / `BUSINESS_LIMIT` | — | `30` / `500` / `2000` | Лимиты сообщений за период (§4) |
@@ -427,6 +433,8 @@ LIMIT    :rag_top_k;
 | `RATE_LIMIT_PER_MINUTE` | — | `20` | Сообщений/мин от одного пользователя |
 | `MAX_MESSAGE_LEN` | — | `4000` | Ограничение длины входного сообщения |
 | `ADMIN_IDS` | — | *(пусто)* | CSV Telegram id администраторов |
+| `SUPPORT_USERNAME` | — | *(пусто)* | @username поддержки в `/help`, `/privacy`, ошибках |
+| `RETENTION_DAYS` | — | `90` | Хранение истории сообщений (`0` — отключить очистку) |
 | `DEFAULT_TZ` | — | `UTC` | Таймзона по умолчанию |
 | `LOG_LEVEL` | — | `INFO` | Уровень логирования |
 
@@ -498,7 +506,7 @@ LIMIT    :rag_top_k;
 
 - SQL-инъекции: только ORM / параметризованные запросы.
 - Ввод пользователя: ограничение длины (`MAX_MESSAGE_LEN`), корректное экранирование при отправке HTML/MarkdownV2.
-- Админ-хэндлеры (`/stats`, `/refund`) — только для `ADMIN_IDS`.
+- Админ-хэндлеры (`/adminstats`, `/broadcast`, `/refund`) — только для `ADMIN_IDS`.
 - Rate limiting (§8.4) — защита от злоупотреблений и расхода бюджета LLM.
 
 ## 10. Масштабирование
@@ -506,6 +514,7 @@ LIMIT    :rag_top_k;
 ### Этап 1 — один инстанс (до ~1k активных пользователей)
 
 - 1 контейнер `app`: long polling, SQLite, без Redis.
+- Схема БД — Alembic; миграции применяются автоматически при старте.
 - Нулевая инфраструктура. Ограничения: SQLite (один писатель, риск `database is locked` на пиках) и single-instance polling.
 
 ### Этап 2 — управляемая инфраструктура (1k–50k)

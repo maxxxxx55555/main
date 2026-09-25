@@ -15,12 +15,15 @@ Telegram Stars (Freemium / Pro / Business).
 
 ## Возможности MVP (v1)
 
-- ✅ Диалог с LLM от лица вашего бизнеса (OpenAI-совместимый API: GLM / OpenAI / прокси)
-- ✅ База знаний (RAG): загрузите FAQ и цены — бот отвечает строго по ним (Pro/Business)
+- ✅ Диалог с LLM от лица вашего бизнеса (OpenAI-совместимый API: Groq/OpenRouter/GLM/OpenAI)
+- ✅ База знаний (RAG): текст сообщением или файл `.txt`/`.md` — бот отвечает строго по вашим данным
 - ✅ Freemium-лимиты: атомарное списание, скользящие 30 дней, ленивый сброс
-- ✅ Оплата Telegram Stars: invoice → pre_checkout → идемпотентная активация
-- ✅ Admin: статистика, возвраты (`/refund`)
-- ✅ Приватность: `/forget_me` удаляет все данные пользователя (CASCADE)
+- ✅ Оплата Telegram Stars: invoice → pre_checkout → идемпотентная активация, проверка плательщика
+- ✅ Admin: `/adminstats` (выручка/возвраты/тарифы), `/broadcast`, `/refund`
+- ✅ Приватность: `/privacy`, `/forget_me` (CASCADE-удаление), retention-очистка истории
+- ✅ UX: typing-индикатор, безопасный HTML, разбиение длинных ответов, `/cancel`
+- ✅ Нативное меню команд (`setMyCommands`) синхронизируется при старте
+- ✅ Миграции Alembic применяются автоматически при старте — dev и prod одинаковы
 - ✅ Отказоустойчивость: ретраи LLM, fallback-провайдер, возврат лимита при сбое
 - ✅ Mock-режим LLM: полный цикл разработки/тестов без внешних ключей
 
@@ -29,11 +32,14 @@ Telegram Stars (Freemium / Pro / Business).
 ```bash
 git clone <repo> && cd bot
 python -m venv .venv
-.venv\Scripts\pip install -e .[dev]      # Windows; Linux/macOS: .venv/bin/pip ...
-copy .env.example .env                   # вписать BOT_TOKEN от @BotFather
-.venv\Scripts\pytest -q                  # тесты: зелёные без LLM-ключа
-.venv\Scripts\python -m app.main         # запуск бота (LLM в mock-режиме)
+.venv\Scripts\pip install -r requirements.txt   # Windows; Linux/macOS: .venv/bin/pip ...
+copy .env.example .env                          # вписать BOT_TOKEN от @BotFather
+.venv\Scripts\pytest -q                         # 88 тестов: зелёные без LLM-ключа
+.venv\Scripts\python -m app.main                # запуск бота (LLM в mock-режиме)
 ```
+
+> Для установки пакетом: `pip install -e ".[dev]"` (и `".[chroma]"` — если нужен
+> семантический поиск ChromaDB; по умолчанию RAG работает на встроенном лексическом поиске).
 
 Без `LLM_API_KEY` бот работает на **MockProvider** — отвечает детерминированными
 заглушками. Для реальных ответов впишите ключ:
@@ -63,8 +69,9 @@ bot/handlers (Telegram I/O) → services (бизнес-логика) → db/repo
 ```
 
 - **Стек:** Python 3.11+, aiogram 3, SQLAlchemy 2 (async), SQLite (dev) / PostgreSQL 16 + pgvector (prod), Redis (опц.)
-- **LLM:** единый интерфейс провайдера, base_url конфигурируется → смена модели без правок кода
-- **Платежи:** идемпотентность по `telegram_payment_charge_id` (UNIQUE)
+- **LLM:** единый интерфейс провайдера с пресетами Groq/OpenRouter/OpenAI/GLM → смена модели без правок кода
+- **RAG:** лексический BM25-lite встроен (без зависимостей); `VECTOR_STORE=chroma` — локальная семантическая модель
+- **Платежи:** идемпотентность по `telegram_payment_charge_id` (UNIQUE) + проверка, что платит владелец инвойса
 - **Лимиты:** атомарный `UPDATE … WHERE messages_used < limit` — гонки исключены
 
 Подробно (схема БД, поток Stars, edge cases, безопасность, масштабирование):
@@ -85,29 +92,32 @@ docker compose --profile prod up -d --build
 ## Тесты
 
 ```bash
-pytest -q          # unit: лимиты, биллинг, RAG, контекст, провайдер
-ruff check app     # линтер
+pytest -q                                    # 88 тестов: лимиты, биллинг, RAG, роутеры, интеграция
+ruff check app migrations tests              # линтер
+python -m compileall -q app migrations tests  # синтаксическая проверка
 ```
 
 Тесты используют SQLite in-memory и MockProvider — без сети и секретов.
 
 ## Roadmap
 
-- [ ] v1.1: alembic-миграции, webhook-режим (aiohttp + secret_token), summary длинных диалогов
-- [ ] v2: аналитика (конверсия воронки), pgvector HNSW, экспорт лидов, реферальная программа
+- [x] v1.1: alembic-миграции (автозапуск при старте), webhook-режим, healthcheck, retention, `/privacy`
+- [ ] v1.2: summary длинных диалогов, экспорт лидов, аналитика воронки
+- [ ] v2: pgvector HNSW, CRM-интеграции, реферальная программа
 - [ ] v3: white label, API для Enterprise, автоматизации (вебхуки → CRM)
 
 ## Структура
 
 ```
 app/
-├── main.py                  # сборка и запуск (polling, graceful shutdown)
+├── main.py                  # сборка и запуск (polling/webhook, graceful shutdown)
 ├── config.py                # pydantic-settings — единственный источник конфигурации
-├── db/                      # движок, модели (User, Message, Payment, KnowledgeBase), repo
+├── db/                      # движок, автозапуск Alembic, модели, repo
 ├── services/
-│   ├── ai/                  # provider (OpenAI-compat | mock), prompt, context, rag
-│   ├── billing/             # каталог тарифов, Telegram Stars (§5)
-│   └── limits/              # атомарное списание, скользящий период
-├── bot/                     # роутер, middlewares (db/user/throttling), handlers, keyboards
-└── utils/                   # логирование без секретов
+│   ├── ai/                  # provider (OpenAI-compat | mock), prompt, context, rag, scoring
+│   ├── billing/             # каталог тарифов, Telegram Stars
+│   ├── limits/              # атомарное списание, скользящий период
+│   └── maintenance.py       # retention-очистка истории
+├── bot/                     # роутер, middlewares, handlers, keyboards, texts, helpers
+└── utils/                   # логирование без секретов, безопасный HTML/markdown-lite
 ```

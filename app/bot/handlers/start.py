@@ -18,6 +18,7 @@ from app.config import Settings
 from app.db.models.user import User
 from app.db.repo.knowledge import KnowledgeRepo
 from app.db.repo.messages import MessageRepo
+from app.db.repo.payments import PaymentRepo
 from app.services.ai.rag import RagService
 from app.services.billing.plans import PlanCatalog
 
@@ -91,6 +92,17 @@ async def cb_menu(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
 
 
+@router.message(Command("forget_me"))
+async def cmd_forget_me(message: Message, state: FSMContext) -> None:
+    """Командный вход в удаление данных: тот же confirm-экран, что и по кнопке."""
+    await state.clear()
+    await message.answer(
+        "⚠️ Удалить <b>все</b> ваши данные: профиль, историю диалогов, базу знаний?\n"
+        "Действие необратимо.",
+        reply_markup=forget_confirm_kb(),
+    )
+
+
 @router.callback_query(F.data == "forget_me")
 async def cb_forget(callback: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
@@ -111,6 +123,9 @@ async def cb_forget_confirm(
     rag: RagService | None = None,
 ) -> None:
     user_id = user.id
+    # Платежи ссылаются на пользователя через RESTRICT: сначала удаляем их,
+    # иначе удаление профиля платящего пользователя упадёт на PostgreSQL.
+    await PaymentRepo(session).delete_for_user(user_id)
     await MessageRepo(session).delete_history(user_id)
     if rag is not None:
         await rag.forget_owner(session, user_id)  # SQLite и/или ChromaDB
