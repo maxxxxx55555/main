@@ -9,12 +9,17 @@
 | `QUICK_START.md` | 5-minute quick start guide |
 | `TROUBLESHOOTING.md` | Common problems and solutions |
 | `SECURITY.md` | Security checklist |
+| `RUNBOOK.md` | Recovery and maintenance procedures |
+| `ONBOARDING.md` | Difficulty assessment and what to expect |
+| `WITHDRAW.md` | How to withdraw to Russian bank card |
+| `WITHOUT_IP.md` | Mining without IP/self-employment |
 | `MANIFEST.md` | This file - project inventory |
 | `.env.example` | Environment template (copy to .env) |
 | `.gitignore` | Files to exclude from git |
 | `setup.sh` | One-command setup script |
 | `scripts/apply_limits.sh` | GPU power/temp limits |
 | `scripts/watchdog.sh` | Monitoring script |
+| `scripts/update.sh` | Update script for T-Rex miner |
 | `deploy/miner.service` | systemd service unit |
 | `deploy/watchdog.cron` | Cron configuration for watchdog |
 
@@ -29,6 +34,10 @@ my-mining-server/
 ├── QUICK_START.md
 ├── SECURITY.md
 ├── TROUBLESHOOTING.md
+├── RUNBOOK.md
+├── ONBOARDING.md
+├── WITHDRAW.md
+├── WITHOUT_IP.md
 ├── setup.sh
 ├── scripts/
 │   ├── apply_limits.sh

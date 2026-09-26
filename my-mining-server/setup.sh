@@ -84,6 +84,7 @@ chown -R miner:miner /opt/my-mining-server
 # Copy scripts to /opt/my-mining-server for watchdog access
 cp "$SCRIPT_DIR/scripts/apply_limits.sh" /opt/my-mining-server/scripts/
 cp "$SCRIPT_DIR/scripts/watchdog.sh" /opt/my-mining-server/scripts/
+cp "$SCRIPT_DIR/scripts/update.sh" /opt/my-mining-server/scripts/
 cp "$SCRIPT_DIR/deploy/miner.service" /opt/my-mining-server/deploy/
 chmod +x /opt/my-mining-server/scripts/*.sh
 chown -R miner:miner /opt/my-mining-server

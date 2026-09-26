@@ -239,6 +239,16 @@ Yes, you can withdraw to a Russian bank card. See [WITHDRAW.md](./WITHDRAW.md) f
 
 **Bottom line:** As a regular citizen (физлицо), you can mine, sell on Binance, and withdraw to your card. No IP needed. No self-employment needed. Only declare taxes if annual income exceeds 5 million RUB.
 
+## Recovery and Maintenance
+
+See [RUNBOOK.md](./RUNBOOK.md) for step-by-step recovery procedures:
+- Miner stopped working
+- GPU overheating
+- Hashrate drops to zero
+- Watchdog failures
+- After system reboot
+- Full recovery procedure
+
 ## Difficulty Assessment
 
 See [ONBOARDING.md](./ONBOARDING.md) for a realistic assessment.
