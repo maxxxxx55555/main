@@ -1,123 +1,110 @@
-# 🤖 AI-Сотрудник — Telegram AI-ассистент для малого бизнеса
+# Mining Server
 
-Telegram-бот «AI-Сотрудник»: отвечает клиентам вашего бизнеса 24/7, квалифицирует
-лидов, записывает на консультации и отвечает по вашей базе знаний. Монетизация —
-Telegram Stars (Freemium / Pro / Business).
+One-command GPU mining setup for Ravencoin (RVN) on Ubuntu WSL.
 
-**$0-стек:** SQLite + Groq/OpenRouter (бесплатные LLM) + ChromaDB (локальные векторы) —
-ноль ежемесячных расходов на инфраструктуру.
+## Quick Start (Windows)
 
-> ⚡ **Быстрый старт:** [`QUICK_START.md`](QUICK_START.md) — бот работает за 5 минут, без Docker
-> 💸 **Хостинг за $0:** [`FREE_DEPLOY.md`](FREE_DEPLOY.md) (Cloudflare Tunnel / Render Free)
-> 🚀 **Деплой на VPS (€5):** [`DEPLOY.md`](DEPLOY.md) · 📊 **Мониторинг:** [`MONITORING.md`](MONITORING.md)
-> ✅ **Чек-лист запуска:** [`CHECKLIST.md`](CHECKLIST.md) · 📣 **Маркетинг:** [`docs/LAUNCH_MATERIALS.md`](docs/LAUNCH_MATERIALS.md)
-> 📚 Продукт и архитектура: [`docs/PRD.md`](docs/PRD.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/MARKETING.md`](docs/MARKETING.md)
+### Option A: Mining Only
 
-## Возможности MVP (v1)
+1. Download `START-MINING.ps1` from this repo
+2. Double-click it
+3. Enter your RVN wallet address when prompted
+4. Enter your card last 4 digits (for reference only)
+5. Wait 10-30 minutes for setup
+6. Done — miner is running
 
-- ✅ Диалог с LLM от лица вашего бизнеса (OpenAI-совместимый API: Groq/OpenRouter/GLM/OpenAI)
-- ✅ База знаний (RAG): текст сообщением или файл `.txt`/`.md` — бот отвечает строго по вашим данным
-- ✅ Freemium-лимиты: атомарное списание, скользящие 30 дней, ленивый сброс
-- ✅ Оплата Telegram Stars: invoice → pre_checkout → идемпотентная активация, проверка плательщика
-- ✅ Admin: `/adminstats` (выручка/возвраты/тарифы), `/broadcast`, `/refund`
-- ✅ Приватность: `/privacy`, `/forget_me` (CASCADE-удаление), retention-очистка истории
-- ✅ UX: typing-индикатор, безопасный HTML, разбиение длинных ответов, `/cancel`
-- ✅ Нативное меню команд (`setMyCommands`) синхронизируется при старте
-- ✅ Миграции Alembic применяются автоматически при старте — dev и prod одинаковы
-- ✅ Отказоустойчивость: ретраи LLM, fallback-провайдер, возврат лимита при сбое
-- ✅ Mock-режим LLM: полный цикл разработки/тестов без внешних ключей
+### Option B: Mining + Telegram Bot
 
-## Быстрый старт (2 минуты, без ключей)
+1. Download `START-ALL.ps1` from this repo
+2. Double-click it
+3. Enter your RVN wallet address
+4. Enter your card last 4 digits
+5. Enter your Telegram bot token (from @BotFather)
+6. Enter your admin user ID (from @userinfobot)
+7. Wait 10-30 minutes
+8. Done — both are running
+
+### Option C: Bash (Linux/Mac)
 
 ```bash
-git clone <repo> && cd bot
-python -m venv .venv
-.venv\Scripts\pip install -r requirements.txt   # Windows; Linux/macOS: .venv/bin/pip ...
-copy .env.example .env                          # вписать BOT_TOKEN от @BotFather
-.venv\Scripts\pytest -q                         # 91 тест: зелёные без LLM-ключа
-.venv\Scripts\python -m app.main                # запуск бота (LLM в mock-режиме)
+wget https://raw.githubusercontent.com/maxxxxx55555/main/start-all.sh
+chmod +x start-all.sh
+sudo bash start-all.sh
 ```
 
-> Для установки пакетом: `pip install -e ".[dev]"` (и `".[chroma]"` — если нужен
-> семантический поиск ChromaDB; по умолчанию RAG работает на встроенном лексическом поиске).
+## What Gets Installed
 
-Без `LLM_API_KEY` бот работает на **MockProvider** — отвечает детерминированными
-заглушками. Для реальных ответов впишите ключ:
+- NVIDIA driver (if not present)
+- T-Rex miner (latest version)
+- systemd service (autostart on boot)
+- GPU power/temp limits (prevents overheating)
+- Firewall (only necessary ports)
+- Watchdog cron (auto-restart on crash)
 
-```env
-LLM_API_KEY=ваш_ключ
-# GLM: https://open.bigmodel.cn/api/paas/v4
-# OpenAI: https://api.openai.com/v1
-```
-
-## Тарифы
-
-| Тариф | Цена | Лимит/30 дней | Функции |
-|---|---|---|---|
-| Free | 0 ⭐️ | 30 | базовый чат |
-| Pro | 100 ⭐️ | 500 | + база знаний (RAG) |
-| Business | 250 ⭐️ | 2000 | + RAG, приоритет |
-
-Цены/лимиты переопределяются через `.env` (`PRO_PRICE_STARS`, `PRO_LIMIT`, …) — без релиза кода.
-
-## Архитектура
-
-Модульный монолит со строгой слоистостью:
-
-```
-bot/handlers (Telegram I/O) → services (бизнес-логика) → db/repo (доступ к данным)
-```
-
-- **Стек:** Python 3.11+, aiogram 3, SQLAlchemy 2 (async), SQLite (dev) / PostgreSQL 16 + pgvector (prod), Redis (опц.)
-- **LLM:** единый интерфейс провайдера с пресетами Groq/OpenRouter/OpenAI/GLM → смена модели без правок кода
-- **RAG:** лексический BM25-lite встроен (без зависимостей); `VECTOR_STORE=chroma` — локальная семантическая модель
-- **Платежи:** идемпотентность по `telegram_payment_charge_id` (UNIQUE) + проверка, что платит владелец инвойса
-- **Лимиты:** атомарный `UPDATE … WHERE messages_used < limit` — гонки исключены
-
-Подробно (схема БД, поток Stars, edge cases, безопасность, масштабирование):
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
-
-## Docker
+## Management Commands
 
 ```bash
-# Dev-профиль: только бот + SQLite
-docker compose up -d --build
+# Check status
+wsl -d Ubuntu bash -c 'sudo systemctl status miner'
 
-# Prod-профиль: + PostgreSQL (pgvector) + Redis
-# DATABASE_URL=postgresql+asyncpg://bot:secret@postgres:5432/aiemployee
-# REDIS_URL=redis://redis:6379/0
-docker compose --profile prod up -d --build
+# View logs
+wsl -d Ubuntu bash -c 'sudo journalctl -u miner -f'
+
+# Check GPU
+wsl -d Ubuntu bash -c 'nvidia-smi'
+
+# Stop miner
+wsl -d Ubuntu bash -c 'sudo systemctl stop miner'
+
+# Start miner
+wsl -d Ubuntu bash -c 'sudo systemctl start miner'
+
+# Restart miner
+wsl -d Ubuntu bash -c 'sudo systemctl restart miner'
 ```
 
-## Тесты
+## Earnings
 
-```bash
-pytest -q                                    # 91 тест: лимиты, биллинг, RAG, роутеры, интеграция
-ruff check app migrations tests              # линтер
-python -m compileall -q app migrations tests  # синтаксическая проверка
+- Check pool: https://2miners.com/profile
+- Check wallet: https://ravencoin.com/
+- See WITHDRAW.md for how to withdraw to Russian card
+- See WITHOUT_IP.md for mining without IP/self-employment
+
+## Documentation
+
+| File | Description |
+|------|-------------|
+| `README.md` | This file |
+| `my-mining-server/README.md` | Full documentation |
+| `my-mining-server/QUICK_START.md` | 5-minute quick start |
+| `my-mining-server/EARN.md` | How to earn |
+| `my-mining-server/WITHDRAW.md` | Withdraw to Russian card |
+| `my-mining-server/WITHOUT_IP.md` | Without IP/self-employment |
+| `my-mining-server/RUNBOOK.md` | Recovery procedures |
+| `my-mining-server/UPDATE.md` | Update guide |
+| `my-mining-server/SECURITY.md` | Security checklist |
+| `my-mining-server/TROUBLESHOOTING.md` | Fix common problems |
+| `my-mining-server/ONBOARDING.md` | Difficulty assessment |
+
+## Project Structure
+
+```
+.
+├── START-MINING.ps1    # Windows: mining only
+├── START-BOT.ps1       # Windows: bot only
+├── START-ALL.ps1       # Windows: mining + bot
+├── start-mining.sh     # Linux: mining only
+├── start-bot.sh        # Linux: bot only
+├── start-all.sh        # Linux: mining + bot
+└── my-mining-server/   # Mining project
+    ├── setup.sh        # One-command setup
+    ├── scripts/        # GPU limits, watchdog, update
+    └── deploy/         # systemd service, cron
 ```
 
-Тесты используют SQLite in-memory и MockProvider — без сети и секретов.
+## Requirements
 
-## Roadmap
-
-- [x] v1.1: alembic-миграции (автозапуск при старте), webhook-режим, healthcheck, retention, `/privacy`
-- [ ] v1.2: summary длинных диалогов, экспорт лидов, аналитика воронки
-- [ ] v2: pgvector HNSW, CRM-интеграции, реферальная программа
-- [ ] v3: white label, API для Enterprise, автоматизации (вебхуки → CRM)
-
-## Структура
-
-```
-app/
-├── main.py                  # сборка и запуск (polling/webhook, graceful shutdown)
-├── config.py                # pydantic-settings — единственный источник конфигурации
-├── db/                      # движок, автозапуск Alembic, модели, repo
-├── services/
-│   ├── ai/                  # provider (OpenAI-compat | mock), prompt, context, rag, scoring
-│   ├── billing/             # каталог тарифов, Telegram Stars
-│   ├── limits/              # атомарное списание, скользящий период
-│   └── maintenance.py       # retention-очистка истории
-├── bot/                     # роутер, middlewares, handlers, keyboards, texts, helpers
-└── utils/                   # логирование без секретов, безопасный HTML/markdown-lite
-```
+- Windows 10/11 with WSL
+- NVIDIA GPU
+- Internet connection
+- ~10 GB free disk space
