@@ -103,6 +103,9 @@ class Settings(BaseSettings):
     # --- Misc ---
     log_level: str = "INFO"
 
+    # --- AI Persona (premium: custom business personality) ---
+    ai_persona: str = "auto"  # auto | realtor | ecomm | consultant | healthcare | education
+
     @property
     def admin_id_set(self) -> set[int]:
         """ADMIN_IDS терпим к формату: «1,2 3;4», пробелы, мусор — пропускаем с варнингом."""

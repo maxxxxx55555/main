@@ -16,6 +16,7 @@ from app.bot.helpers import send_llm
 from app.bot.keyboards.inline import upsell_kb
 from app.config import Settings
 from app.db.models.user import User
+from app.db.repo.leads import LeadRepo
 from app.db.repo.messages import MessageRepo
 from app.services.ai.context import build_context
 from app.services.ai.prompt import build_system_prompt
@@ -63,7 +64,7 @@ async def handle_chat(
     repo = MessageRepo(session)
     await repo.add_message(user.id, "user", text)
 
-    # 3) Контекст + RAG (база знаний — только на платных тарифах)
+        # 3) Контекст + RAG (база знаний — только на платных тарифах)
     knowledge_text = None
     if user.plan != "free":
         try:
@@ -74,10 +75,12 @@ async def handle_chat(
         if chunks:
             knowledge_text = "\n---\n".join(chunks)
 
+    # Persona: admin override > settings.ai_persona > "auto"
+    persona = getattr(settings, "_ai_persona_override", None) or settings.ai_persona
     history_rows = await repo.recent(user.id, settings.context_window)
     history = [(row.role, row.content) for row in history_rows]
     llm_messages = build_context(
-        build_system_prompt(knowledge_text, user.tz),
+        build_system_prompt(knowledge_text, user.tz, persona),
         history[:-1],  # текущее сообщение добавляем отдельно последним
         settings.context_window,
         settings.context_token_budget,
@@ -109,6 +112,19 @@ async def handle_chat(
     markup = None
     if suffix:
         markup = upsell_kb() if user.plan == "free" else None
+
+    # Premium: автоматический захват лидов из диалога
+    try:
+        await LeadRepo(session).capture(
+            user_id=user.id,
+            interest="Hot Lead" if "купить" in text.lower() or "заказ" in text.lower() else "General",
+            score=85 if user.plan == "pro" else 60,
+            notes=f"Q: {text[:100]}",
+        )
+        await session.commit()
+    except Exception:  # Lead capture must never break the chat flow
+        logger.exception("Lead capture failed for user_id=%s", user.id)
+
     await send_llm(message, content + suffix, reply_markup=markup)
 
 

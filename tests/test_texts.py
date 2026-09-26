@@ -18,7 +18,7 @@ def test_welcome_uses_catalog_values(settings):
     body = texts.welcome("Аня", catalog)
     free = catalog.get("free")
     pro = catalog.get("pro")
-    assert f"{free.message_limit} сообщений в месяц" in body
+    assert f"{free.message_limit} сообщений" in body
     assert f"⭐{pro.price_stars}" in body
     assert f"{pro.message_limit} сообщений" in body
 

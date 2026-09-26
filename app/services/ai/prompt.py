@@ -1,6 +1,11 @@
-"""Системный промпт «AI-Сотрудника» (§6.2)."""
+"""Системный промпт «AI-Сотрудника» (§6.2).
+
+Поддерживает кастомные AI-персоны (premium feature): realtor, ecomm, consultant, etc.
+"""
 
 from __future__ import annotations
+
+from app.services.ai.personas import PERSONA_PROMPTS
 
 SYSTEM_PROMPT = """Ты — «AI-Сотрудник», вежливый и эффективный виртуальный ассистент бизнеса.
 
@@ -9,7 +14,7 @@ SYSTEM_PROMPT = """Ты — «AI-Сотрудник», вежливый и эф�
 2. Квалифицировать лидов: уточнять имя, потребность, срочность, бюджет.
 3. Записывать на консультацию: предлагать удобное время и собирать контакт.
 4. Отвечать на частые вопросы (FAQ) строго по базе знаний, если она дана ниже.
-5. Собирать обратную связь после interactions.
+5. Собирать обратную связь после каждого диалога.
 
 Правила:
 - Отвечай на языке пользователя. По умолчанию — на русском.
@@ -25,7 +30,12 @@ SYSTEM_PROMPT = """Ты — «AI-Сотрудник», вежливый и эф�
 """
 
 
-def build_system_prompt(knowledge: str | None = None, tz: str = "UTC") -> str:
+def build_system_prompt(
+    knowledge: str | None = None,
+    tz: str = "UTC",
+    persona: str = "auto",
+) -> str:
+    """Сбор системного промпта с опциональной AI-персоной и базой знаний."""
     import datetime as dt
 
     if knowledge:
@@ -35,4 +45,14 @@ def build_system_prompt(knowledge: str | None = None, tz: str = "UTC") -> str:
         )
     else:
         knowledge_block = "База знаний бизнеса пока не заполнена — отвечай общими фразами и собирай контакт."
-    return SYSTEM_PROMPT.format(knowledge_block=knowledge_block, now_utc=dt.datetime.now(dt.UTC).isoformat(timespec="minutes"))
+
+    prompt = SYSTEM_PROMPT.format(
+        knowledge_block=knowledge_block,
+        now_utc=dt.datetime.now(dt.UTC).isoformat(timespec="minutes"),
+    )
+
+    # Prepend persona instruction if not "auto"
+    persona_prompt = PERSONA_PROMPTS.get(persona, "")
+    if persona_prompt:
+        return f"{persona_prompt}\n\n{prompt}"
+    return prompt
