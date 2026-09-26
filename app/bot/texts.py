@@ -104,6 +104,66 @@ NOT_TEXT = (
 
 UNKNOWN_COMMAND = "🤔 Не знаю такой команды. Полный список — /help"
 
+# --- Group chat texts ---
+NOT_ADMIN = "⛔️ Только администраторы чата могут использовать эту команду."
+
+DEFAULT_WELCOME_GROUP = "👋 Добро пожаловать, {name}! 👋\n\n" \
+    "📚 Правила чата доступны по /rules\n" \
+    "💬 Пишем по делу, уважаем друг друга.\n" \
+    "🎯 Активность учитывается — топ на /top"
+
+
+def chat_stats(stats: dict[str, int]) -> str:
+    """Статистика активности чата."""
+    total = stats.get("total_messages", 0)
+    active = stats.get("active_users", 0)
+    active_week = stats.get("active_week", 0)
+    return (
+        f"📊 <b>Статистика чата</b>\n\n"
+        f"Всего сообщений: <b>{total}</b>\n"
+        f"Активных участников: <b>{active}</b>\n"
+        f"Активных за неделю: <b>{active_week}</b>\n\n"
+        "🏆 Рейтинг: /top · 🔄 Сбросить: /resetactivity"
+    )
+
+
+# --- AI Group Bot texts ---
+
+AI_MODERATION_SPOOF = "🛡️ <b>AI-модерация включена</b>\n\n" \
+    "ИИ проверяет семантику сообщений, а не только ключевые слова."
+
+AI_SENTIMENT_POSITIVE = "😊 Позитивный"
+AI_SENTIMENT_NEUTRAL = "😐 Нейтральный"
+AI_SENTIMENT_NEGATIVE = "😠 Негативный"
+
+
+def sentiment_label(sentiment: str, compound: float) -> str:
+    """Человекочитаемая метка тональности."""
+    labels = {
+        "positive": AI_SENTIMENT_POSITIVE,
+        "neutral": AI_SENTIMENT_NEUTRAL,
+        "negative": AI_SENTIMENT_NEGATIVE,
+    }
+    base = labels.get(sentiment, AI_SENTIMENT_NEUTRAL)
+    return f"{base} (оценка: {compound:+.2f})"
+
+
+def chat_summary_text(summary: str, topics: list[str], action_items: list[str], sentiment: str) -> str:
+    """Текст резюме чата."""
+    lines = ["📋 <b>AI-резюме чата</b>\n"]
+    lines.append(f"<b>Сводка:</b> {summary}\n")
+    if topics:
+        lines.append(f"<b>Темы:</b> {', '.join(topics)}\n")
+    if action_items:
+        lines.append(f"<b>Задачи:</b> {', '.join(action_items)}\n")
+    lines.append(f"<b>Тональность:</b> {sentiment_label(sentiment, 0)}")
+    return "\n".join(lines)
+
+
+def ai_error_msg() -> str:
+    """Сообщение об ошибке ИИ."""
+    return "😔 AI-сервис временно недоступен. Попробуйте позже."
+
 LLM_DOWN = (
     "😔 Сервис AI временно недоступен, попробуйте через несколько минут.\n"
     "Ваш лимит не списан."

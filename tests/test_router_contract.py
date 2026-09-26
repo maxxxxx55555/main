@@ -3,13 +3,13 @@
 Регрессии, которые ловит файл (task_0006):
 
 1. Повторные вызовы ``build_router()`` дают независимые root-роутеры, каждый
-   ровно с 6 суброутерами и собственными объектами хэндлеров.
+   ровно с 7 суброутерами и собственными объектами хэндлеров.
 2. После сборки ни один модульный router из ``app.bot.handlers`` не получает
    parent: aiogram запрещает подключать один Router к двум родителям
    (RuntimeError «Router is already attached»), поэтому прямая вставка
    модульных роутеров ломала бы повторную сборку dispatcher.
 3. Порядок суброутеров задаёт приоритет обработки:
-   payments -> admin -> start -> knowledge -> menu -> chat.
+      payments -> admin -> group -> start -> knowledge -> menu -> chat.
 4. У каждого суброутера есть message-хэндлеры, а клонирование сохраняет все
    регистрации наблюдаемых событий (хэндлеры, фильтры, флаги, middlewares).
 5. Повторная сборка dispatcher через ``app.main._build_dispatcher`` на новом
@@ -31,14 +31,15 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.pool import StaticPool
 
 from app.bot.commands import BOT_COMMANDS, build_bot_commands
-from app.bot.handlers import admin, chat, knowledge, menu, payments, start
+from app.bot.handlers import admin, chat, group, knowledge, menu, payments, start
 from app.bot.router import build_router
 
-EXPECTED_ORDER: tuple[str, ...] = ("payments", "admin", "start", "knowledge", "menu", "chat")
+EXPECTED_ORDER: tuple[str, ...] = ("payments", "admin", "group", "start", "knowledge", "menu", "chat")
 
 MODULE_ROUTERS: dict[str, Router] = {
     "payments": payments.router,
     "admin": admin.router,
+    "group": group.router,
     "start": start.router,
     "knowledge": knowledge.router,
     "menu": menu.router,
@@ -78,8 +79,8 @@ def test_build_router_returns_independent_roots_with_six_children():
     assert isinstance(root_a, Router) and isinstance(root_b, Router)
     assert root_a is not root_b, "каждый вызов build_router() обязан создавать новый root"
     assert root_a.parent_router is None and root_b.parent_router is None
-    assert len(root_a.sub_routers) == 6, "root обязан содержать 6 суброутеров"
-    assert len(root_b.sub_routers) == 6, "root обязан содержать 6 суброутеров"
+    assert len(root_a.sub_routers) == 7, "root обязан содержать 7 суброутеров"
+    assert len(root_b.sub_routers) == 7, "root обязан содержать 7 суброутеров"
 
     # Деревья не переиспользуют Router-объекты: aiogram не даёт привязать один
     # Router к двум родителям, поэтому повторная сборка ломалась бы.

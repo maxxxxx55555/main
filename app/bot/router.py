@@ -37,10 +37,11 @@ def _clone_router(source: Router, name: str) -> Router:
 def build_router() -> Router:
     """Создаёт новый root-роутер с хэндлерами в порядке приоритета."""
     router = Router(name="root")
-    from app.bot.handlers import admin, chat, knowledge, menu, payments, start
+    from app.bot.handlers import admin, chat, group, knowledge, menu, payments, start
 
     router.include_router(_clone_router(payments.router, "payments"))
     router.include_router(_clone_router(admin.router, "admin"))
+    router.include_router(_clone_router(group.router, "group"))
     router.include_router(_clone_router(start.router, "start"))
     router.include_router(_clone_router(knowledge.router, "knowledge"))
     router.include_router(_clone_router(menu.router, "menu"))
