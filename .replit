@@ -1,0 +1,3 @@
+run = "python -m app.main"
+entrypoint = "app/main.py"
+modules = ["python3"]
