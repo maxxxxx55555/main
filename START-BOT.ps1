@@ -61,7 +61,7 @@ Write-Host "This may take a few minutes..." -ForegroundColor Gray
 Write-Host ""
 
 wsl -d Ubuntu bash -c "rm -rf /tmp/aibot; git clone https://github.com/maxxxxx55555/aibot.git /tmp/aibot"
-wsl -d Ubuntu bash -c "cd /tmp/aibot && cp .env.example .env && sed -i \"s/BOT_TOKEN=.*/BOT_TOKEN=$token/\" .env && sed -i \"s/ADMIN_IDS=.*/ADMIN_IDS=$admins/\" .env"
+wsl -d Ubuntu bash -c "cd /tmp/aibot && cp .env.example .env && env TOKEN=$token ADMINS=$admins bash -c 'sed -i ""s/BOT_TOKEN=.*/BOT_TOKEN=$TOKEN/"" .env && sed -i ""s/ADMIN_IDS=.*/ADMIN_IDS=$ADMINS/"" .env'"
 
 # Check if docker-compose exists
 $hasDocker = wsl -d Ubuntu bash -c "test -f /tmp/aibot/docker-compose.yml && echo yes"

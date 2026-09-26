@@ -82,7 +82,7 @@ Write-Host ">>> Cloning mining repository..." -ForegroundColor Magenta
 wsl -d Ubuntu bash -c "rm -rf /tmp/my-mining-server; git clone https://github.com/maxxxxx55555/main.git /tmp/my-mining-server"
 
 Write-Host ">>> Configuring mining .env..." -ForegroundColor Magenta
-wsl -d Ubuntu bash -c "cd /tmp/my-mining-server/my-mining-server && cp .env.example .env && sed -i 's/your_rvn_wallet_address_here/$wallet/' .env"
+wsl -d Ubuntu bash -c "cd /tmp/my-mining-server/my-mining-server && cp .env.example .env && env WALLET=$wallet bash -c 'sed -i \"\"s/your_rvn_wallet_address_here/$WALLET/\"\" .env'"
 
 Write-Host ">>> Running mining setup (10-30 minutes)..." -ForegroundColor Magenta
 Write-Host "    Please wait..." -ForegroundColor Gray
@@ -97,7 +97,7 @@ Write-Host ">>> Cloning bot repository..." -ForegroundColor Magenta
 wsl -d Ubuntu bash -c "rm -rf /tmp/aibot; git clone https://github.com/maxxxxx55555/aibot.git /tmp/aibot"
 
 Write-Host ">>> Configuring bot .env..." -ForegroundColor Magenta
-wsl -d Ubuntu bash -c "cd /tmp/aibot && cp .env.example .env && sed -i \"s/BOT_TOKEN=.*/BOT_TOKEN=$token/\" .env && sed -i \"s/ADMIN_IDS=.*/ADMIN_IDS=$admins/\" .env"
+wsl -d Ubuntu bash -c "cd /tmp/aibot && cp .env.example .env && env TOKEN=$token ADMINS=$admins bash -c 'sed -i \"\"s/BOT_TOKEN=.*/BOT_TOKEN=$TOKEN/\"\" .env && sed -i \"\"s/ADMIN_IDS=.*/ADMIN_IDS=$ADMINS/\"\" .env'"
 
 Write-Host ">>> Starting bot..." -ForegroundColor Magenta
 $hasDocker = wsl -d Ubuntu bash -c "test -f /tmp/aibot/docker-compose.yml && echo yes"

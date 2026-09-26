@@ -55,7 +55,7 @@ Write-Host ""
 # --- Step 5: Clone and configure ---
 Write-Host "[5/6] Cloning and configuring mining setup..." -ForegroundColor Yellow
 wsl -d Ubuntu bash -c "rm -rf /tmp/my-mining-server; git clone https://github.com/maxxxxx55555/main.git /tmp/my-mining-server"
-wsl -d Ubuntu bash -c "cd /tmp/my-mining-server/my-mining-server && cp .env.example .env && sed -i 's/your_rvn_wallet_address_here/$wallet/' .env"
+wsl -d Ubuntu bash -c "cd /tmp/my-mining-server/my-mining-server && cp .env.example .env && sed -i ""s/your_rvn_wallet_address_here/$wallet/"" .env"
 Write-Host "Configuration complete." -ForegroundColor Green
 Write-Host ""
 

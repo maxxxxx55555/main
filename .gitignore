@@ -20,4 +20,10 @@ chroma_db/
 *.db
 *.sqlite3
 *.log
-.r.txt
+
+# --- Mining ---
+/tmp/my-mining-server
+/tmp/aibot
+/opt/miner
+/etc/miner
+/var/log/miner
